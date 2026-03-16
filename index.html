@@ -152,8 +152,8 @@ var db = firebase.firestore();
   <div class="hdr-logo">GREED <small>Admin Panel</small></div>
   <nav class="hdr-nav">
     <a href="https://gelateriagreed.it/crm/" class="hdr-link">📊 CRM</a>
-    <a href="#gusti" class="hdr-link active">🍦 Gusti</a>
-    <a href="#promozioni" class="hdr-link">🔥 Promozioni</a>
+    <a href="#gusti" class="hdr-link active" onclick="scrollTo('gusti')">🍦 Gusti</a>
+    <a href="#promozioni" class="hdr-link" onclick="scrollTo('promozioni')">🔥 Promozioni</a>
     <a href="https://greedgelateria.github.io/i-gusti/" class="hdr-link" target="_blank">👁 Vedi sito</a>
   </nav>
 </header>
@@ -168,6 +168,7 @@ var db = firebase.firestore();
     <p>Clicca su un gusto per modificarlo direttamente. Le modifiche vengono salvate su Firebase.</p>
   </div>
 
+  <div id="gusti"></div>
   <!-- STATISTICHE -->
   <div class="stats">
     <div class="stat"><div class="stat-n" id="statTotali">—</div><div class="stat-l">Gusti totali</div></div>
@@ -507,6 +508,35 @@ function salvaPromo(){
     .then(function(){ showToast('✓ Promozioni salvate!'); })
     .catch(function(e){ alert('Errore: '+e.message); });
 }
+
+/* ═══ NAVIGAZIONE ═══ */
+function scrollTo(id){
+  var el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth'});
+  // Aggiorna active nav
+  document.querySelectorAll('.hdr-link').forEach(function(a){
+    a.classList.remove('active');
+  });
+  var links = document.querySelectorAll('.hdr-link');
+  links.forEach(function(a){
+    if(a.getAttribute('href')==='#'+id) a.classList.add('active');
+  });
+}
+
+// Aggiorna nav active durante scroll
+window.addEventListener('scroll', function(){
+  var gusti = document.getElementById('gusti');
+  var promo = document.getElementById('promozioni');
+  if(!gusti||!promo) return;
+  var scrollY = window.scrollY;
+  var promoTop = promo.getBoundingClientRect().top + scrollY - 100;
+  document.querySelectorAll('.hdr-link[href="#gusti"]').forEach(function(a){
+    a.classList.toggle('active', scrollY < promoTop);
+  });
+  document.querySelectorAll('.hdr-link[href="#promozioni"]').forEach(function(a){
+    a.classList.toggle('active', scrollY >= promoTop);
+  });
+});
 
 /* ═══ TOAST ═══ */
 function showToast(msg){
