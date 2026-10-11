@@ -230,9 +230,9 @@ firebase.initializeApp({
 });
 var db = firebase.firestore();
 
-// ── ACCESSO TITOLARE ── gusti, prezzi e promozioni si modificano solo con l'account GREED
+// ── ACCESSO GREED ── gusti e promozioni si modificano solo con un account GREED (titolare o staff)
 (function(){
-  var EMAIL_ADMIN = 'gelateriagreed@gmail.com';
+  var EMAIL_AUTORIZZATE = ['gelateriagreed@gmail.com', 'team.greedfrascati@gmail.com'];
   function schermata(msg){
     var ov = document.getElementById('accesso-admin');
     if(!ov){
@@ -240,7 +240,7 @@ var db = firebase.firestore();
       ov.id = 'accesso-admin';
       ov.style.cssText = 'position:fixed;inset:0;background:#0a0a0a;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:sans-serif;color:#f3ead8;text-align:center;padding:24px';
       ov.innerHTML = '<div style="font-size:42px">🔐</div><div style="font-size:20px;font-weight:700">Admin Gusti</div>'
-        + '<div style="font-size:14px;opacity:.75;max-width:360px">Accedi con l\'account ' + EMAIL_ADMIN + '. Resta memorizzato su questo dispositivo.</div>'
+        + '<div style="font-size:14px;opacity:.75;max-width:360px">Accedi con l\'account GREED (titolare o staff). Resta memorizzato su questo dispositivo.</div>'
         + '<button id="btn-accesso-admin" style="padding:14px 26px;border-radius:10px;border:none;background:#c8962b;color:#111;font-size:16px;font-weight:700">Accedi con Google</button>'
         + '<div id="msg-accesso-admin" style="font-size:13px;color:#e07060;min-height:18px"></div>';
       document.body.appendChild(ov);
@@ -256,7 +256,7 @@ var db = firebase.firestore();
   firebase.auth().onAuthStateChanged(function(u){
     var mostra = function(){
       if(!u){ schermata(); return; }
-      if(u.email !== EMAIL_ADMIN){ firebase.auth().signOut(); schermata('Account ' + u.email + ' non autorizzato.'); return; }
+      if(EMAIL_AUTORIZZATE.indexOf(u.email) === -1){ firebase.auth().signOut(); schermata('Account ' + u.email + ' non autorizzato.'); return; }
       var ov = document.getElementById('accesso-admin'); if(ov) ov.style.display = 'none';
     };
     if(document.body) mostra(); else document.addEventListener('DOMContentLoaded', mostra);
