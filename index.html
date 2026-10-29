@@ -824,13 +824,9 @@ async function caricaStatiControllo() {
       const d = snapD.data();
       deliveryAttivo = d.attivo === true;
     }
-    // Ora Furba — legge dalla lista promozioni
-    const snapP = await db.collection('config').doc('promozioni').get();
-    if (snapP.exists) {
-      const lista = snapP.data().lista || [];
-      const oraFurba = lista.find(p => p.tipo === 'spot' && (p.titolo||'').toLowerCase().includes('furba'));
-      if (oraFurba) oraFurbaAttiva = oraFurba.attiva === true;
-    }
+    // Ora Furba — stesso interruttore del CRM e del server (config/oraFurba)
+    const snapO = await db.collection('config').doc('oraFurba').get();
+    oraFurbaAttiva = snapO.exists && snapO.data().attiva !== false;
     aggiornaUIControllo();
   } catch(e) {
     console.error('Errore caricamento stati:', e);
