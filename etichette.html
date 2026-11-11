@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Etichette banco — GREED</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700;800&family=Noto+Serif+Display:wdth,wght@62.5..100,400..800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{--verde:#1f3a1a;--verde2:#2d6a4f;--crema:#f6f1e6;--oro:#c8a34a;--testo:#2a2a22}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Outfit',sans-serif;background:var(--crema);color:var(--testo)}
+header{background:var(--verde);color:#f6f1e6;padding:14px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:24px;margin:0;letter-spacing:.06em}
+header .sp{flex:1}
+button{font-family:inherit;cursor:pointer;border-radius:8px;border:0;padding:9px 16px;font-size:14px;font-weight:600}
+.b-oro{background:var(--oro);color:var(--verde)} .b-ghost{background:transparent;color:#f6f1e6;border:1px solid rgba(246,241,230,.4)}
+.b-verde{background:var(--verde2);color:#fff}
+main{padding:18px 22px;max-width:1500px;margin:0 auto}
+.barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.tab{background:#fff;border:1px solid #d8ccb4;color:var(--testo)} .tab.on{background:var(--verde2);color:#fff;border-color:var(--verde2)}
+.stato{font-size:13px;color:#6a6a5a}
+.griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.scheda{background:#fff;border:1px solid #e3d8c2;border-radius:12px;padding:12px;display:flex;gap:12px}
+.scheda.sel{outline:3px solid var(--verde2)}
+.anteprima{width:144px;flex-shrink:0}
+.anteprima .eti{transform:scale(.5);transform-origin:top left}
+.anteprima-box{width:144px;height:210px;overflow:hidden;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.campi{flex:1;display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}
+.campi label{font-weight:600;color:#6a5a40;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.campi input,.campi select{width:100%;padding:6px 8px;border:1px solid #d8ccb4;border-radius:6px;font-family:inherit;font-size:13px}
+.chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#eef2ea;color:var(--verde2);font-weight:600}
+.chip.nuovo{background:#fdf0d5;color:#8a5a00}
+/* ── ETICHETTA 72 × 105 mm — stile vintage GREED ── */
+.eti{width:72mm;height:105mm;background:#fff;position:relative;overflow:hidden;color:#1d2a1a}
+.eti .sagoma{position:absolute;inset:0;width:72mm;height:105mm}
+.eti .logo{position:absolute;top:7.2mm;left:0;right:0;text-align:center;font-family:'Montserrat',sans-serif;font-weight:800;font-size:5.4mm;letter-spacing:.12em;padding-left:.12em;color:#1d2a1a;line-height:1}
+.eti .logo img{height:9mm;display:block;margin:0 auto}
+.eti .sotto-logo{position:absolute;top:13.4mm;left:0;right:0;text-align:center;font-family:'Montserrat',sans-serif;font-weight:600;font-size:1.9mm;letter-spacing:.22em;padding-left:.22em;color:#1d2a1a}
+.eti .orn{position:absolute;top:15.8mm;left:0;right:0;text-align:center;color:#d4572e;font-size:2.4mm;line-height:1}
+.eti .corpo{position:absolute;top:18.6mm;bottom:7.6mm;left:8.5mm;right:8.5mm;display:flex;flex-direction:column;align-items:center}
+.eti .it{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:62.5%;font-variation-settings:'wdth' 62.5;font-weight:700;line-height:.98;color:#16241a}
+.eti .en{margin-top:.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:500;line-height:1.05;color:#16241a}
+.eti .img{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;margin:1.2mm 0}
+.eti .img img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
+.eti .img svg{height:100%;max-width:100%}
+.eti .icone{display:flex;flex-shrink:0;justify-content:center;align-items:center;gap:2.4mm}
+.eti .ico{display:flex;align-items:center;gap:1.4mm}
+.eti .ico .tondo{width:7.2mm;height:7.2mm;border:.32mm solid #1d2a1a;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.eti .ico .tondo svg{width:4.6mm;height:4.6mm}
+.eti .ico .tx{font-family:'Montserrat',sans-serif;font-weight:700;font-size:2.05mm;line-height:1.25;letter-spacing:.03em;color:#1d2a1a;text-align:left}
+.eti .ico .tx span{font-weight:600;opacity:.85}
+.eti .sep{width:.25mm;height:6mm;background:#1d2a1a;opacity:.35}
+.eti .claim{flex-shrink:0;margin-bottom:1.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-style:italic;font-size:2.3mm;line-height:1.25;color:#3b4a32}
+/* ── STAMPA: A4 orizzontale, 8 etichette (4 × 2) ── */
+#fogli{display:none}
+@media print{
+  @page{size:A4 landscape;margin:0}
+  body{background:#fff} header,main{display:none!important} #fogli{display:block}
+  .foglio{width:297mm;height:210mm;display:grid;grid-template-columns:repeat(4,72mm);grid-template-rows:repeat(2,105mm);justify-content:center;page-break-after:always;break-after:page}
+  .foglio:last-child{page-break-after:auto;break-after:auto}
+  .eti{outline:.1mm dashed #bbb}
+}
+#login{max-width:420px;margin:60px auto;background:#fff;border-radius:12px;padding:26px;text-align:center;border:1px solid #e3d8c2}
+</style></head><body>
+<header>
+  <h1>GREED · Etichette banco</h1>
+  <span class="stato" id="utente" style="color:#cfd8c4"></span>
+  <span class="sp"></span>
+  <label class="b-ghost" style="padding:9px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">🖼️ Logo GREED<input type="file" accept="image/png,image/svg+xml,image/jpeg" style="display:none" onchange="caricaLogo(this.files[0])"></label>
+  <button class="b-ghost" onclick="selezionaCoda()">Seleziona da stampare</button>
+  <button class="b-oro" onclick="stampa()">🖨️ Stampa selezionate (<span id="nsel">0</span>)</button>
+</header>
+<main>
+  <div id="login" style="display:none"><h2 style="font-family:'Cormorant Garamond',serif;margin-top:0">Accesso</h2>
+    <p class="stato">Le ricette arrivano dal gestionale: serve l'account GREED.</p>
+    <button class="b-verde" onclick="accedi()">Accedi con Google</button><div id="loginErr" class="stato" style="color:#a33;margin-top:10px"></div></div>
+  <div id="app" style="display:none">
+    <div class="barra">
+      <button class="tab on" id="t-coda" onclick="vista('coda')">🆕 Da stampare (<span id="ncoda">0</span>)</button>
+      <button class="tab" id="t-tutti" onclick="vista('tutti')">Tutti i gusti (<span id="ntutti">0</span>)</button>
+      <span class="stato" id="msg">I gusti nuovi del gestionale compaiono qui da soli. Quando sono 8 riempiono un foglio A4.</span>
+    </div>
+    <div class="griglia" id="griglia"></div>
+  </div>
+</main>
+<div id="fogli"></div>
+<script>
+const ALLERGENI_REGOLE = [
+  {k:'LATTE',     re:/\blatte\b(?!\s+di\s+(cocco|soia|mandorl|riso|avena))|panna(?!\s+(soia|vegetale|da cucina alpro))|\bburro\b(?!\s+di\s+(cacao|arachid))|yogurt(?!\s+soia)|ricotta|mascarpone|philadelphia|stracchino|pecorino|parmigiano|castelmagno|erborinato|gorgonzola|taleggio|scamorza|caprino|formagg|kefir|cr[eè]me fra[iî]che|proteine\s+(del\s+)?latte|\bmpc\b|\bwpc\b|siero\s+di\s+latte|lattosio|caseina|dulce de leche|baileys|cioccolato (al latte|bianco)|condensato|savoiard/i},
+  {k:'UOVA',      re:/tuorl|\buov[oa]|albume|maionese|savoiard/i},
+  {k:'GLUTINE',   re:/frumento|\bgrano\b|farina\s+(di\s+)?(grano|frumento|00|0\b|farro|orzo|segale)|\borzo\b|segale|\bavena\b(?!.*senza glutine)|farro|kamut|biscott|savoiard|\bpane\b|pangrattato|briciole|birra|\bmalto\b/i},
+  {k:'FRUTTA A GUSCIO', re:/pistacch|mandorl|nocciol|\bnoc[ei]\b(?!\s+moscata)|anacard|\bpecan|macadamia|noci del brasile|gianduia|pralinat|torrone/i},
+  {k:'ARACHIDI',  re:/arachid|peanut/i},
+  {k:'SOIA',      re:/\bsoia\b|tofu|edamame/i},
+  {k:'PESCE',     re:/\balic[ie]\b|acciug|colatura|tonno|baccal|salmone|merluzz|pesce|sgombr|sardin|worcestershire/i},
+  {k:'CROSTACEI', re:/gamber|scamp|aragost|granchi|crostace/i},
+  {k:'MOLLUSCHI', re:/cozz|vongol|polp[oi]|calamar|seppi|ostric/i},
+  {k:'SEDANO',    re:/sedano/i},
+  {k:'SENAPE',    re:/senape/i},
+  {k:'SESAMO',    re:/sesamo|tahin/i},
+  {k:'SOLFITI',   re:/\bvino\b|marsala|barolo|frascati|moscato|prosecco|vin santo|pedro xim|\baceto\b|spumante|passito/i},
+  {k:'LUPINI',    re:/lupin/i},
+];
+function allergeniIngrediente(nome){
+  const n=String(nome||'');
+  return ALLERGENI_REGOLE.filter(a=>a.re.test(n)).map(a=>a.k);
+}
+// Allergeni della ricetta = rilevati dagli ingredienti ∪ quelli scritti a mano nel campo "allergeni"
+function allergeniRicetta(r){
+  const set=new Set();
+  (r&&r.ingredienti||[]).forEach(i=>allergeniIngrediente(i.nome).forEach(a=>set.add(a)));
+  const manuale=String((r&&r.allergeni)||'').toLowerCase();
+  const MAN={'latte':'LATTE','uov':'UOVA','glutin':'GLUTINE','guscio':'FRUTTA A GUSCIO','arachid':'ARACHIDI','soia':'SOIA','pesce':'PESCE','crostace':'CROSTACEI','mollusc':'MOLLUSCHI','sedano':'SEDANO','senape':'SENAPE','sesamo':'SESAMO','solfit':'SOLFITI','lupin':'LUPINI'};
+  Object.entries(MAN).forEach(([k,v])=>{ if(manuale.includes(k)) set.add(v); });
+  const ordine=ALLERGENI_REGOLE.map(a=>a.k);
+  return [...set].sort((a,b)=>ordine.indexOf(a)-ordine.indexOf(b));
+}
+
+// ILLUSTRAZIONI GREED — stile uniforme: forme piene, contorno verde scuro, ombra morbida, viewBox 120×120
+const OL = '#2f4a2c';
+const sv = body => `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><ellipse cx="60" cy="108" rx="34" ry="5" fill="#2f4a2c" opacity=".12"/><g stroke="${OL}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">${body}</g></svg>`;
+const ILL = {
+  pistacchio: sv(`<path d="M30 70c-6-22 14-44 34-38s30 30 20 46-48 14-54-8z" fill="#c9b48a"/><path d="M40 70c-3-14 9-28 22-24s19 18 13 29-32 8-35-5z" fill="#8bb04a"/><path d="M47 66c0-8 6-14 13-12" fill="none" stroke="#5f8a2c"/><path d="M76 40l8-10" fill="none"/>`),
+  nocciola: sv(`<path d="M60 30c22 0 34 22 30 44s-20 30-30 30-26-8-30-30 8-44 30-44z" fill="#b8763e"/><path d="M34 46c8-14 44-14 52 0-6 6-46 6-52 0z" fill="#8a5428"/><path d="M60 50v48" fill="none" stroke="#9a6232" stroke-width="2" opacity=".6"/><path d="M58 30c-2-6 0-12 4-14" fill="none"/>`),
+  cacao: sv(`<path d="M60 18c20 10 28 34 24 56s-14 32-24 32-20-10-24-32 4-46 24-56z" fill="#7a4a2a"/><path d="M60 22v80M48 30c-6 20-6 52 2 70M72 30c6 20 6 52-2 70" fill="none" stroke="#5a3218" stroke-width="2.5"/><circle cx="92" cy="40" r="7" fill="#e8d6b0"/><circle cx="96" cy="56" r="6" fill="#e8d6b0"/>`),
+  cioccolato: sv(`<rect x="28" y="26" width="64" height="76" rx="6" fill="#5c3418"/><path d="M28 51h64M28 76h64M49 26v76M71 26v76" fill="none" stroke="#3e220f" stroke-width="2.5"/><path d="M28 26h64v18H28z" fill="#7a4a2a"/>`),
+  latte: sv(`<path d="M42 30h36l-4 12 10 16v40c0 4-3 6-6 6H42c-3 0-6-2-6-6V58l10-16z" fill="#fbf7ee"/><path d="M36 64h48v34c0 4-3 6-6 6H42c-3 0-6-2-6-6z" fill="#e7efe0"/><path d="M42 30h36" fill="none"/><path d="M54 80c4-6 8-6 12 0" fill="none" stroke="#8bb04a"/>`),
+  crema: sv(`<ellipse cx="60" cy="66" rx="30" ry="36" fill="#fbf3dd"/><circle cx="60" cy="72" r="18" fill="#f2c14e"/><circle cx="54" cy="66" r="5" fill="#fbe08a" stroke="none"/>`),
+  caffe: sv(`<ellipse cx="46" cy="62" rx="18" ry="26" transform="rotate(-25 46 62)" fill="#6b3d1f"/><path d="M38 42c10 10 6 30 16 40" fill="none" stroke="#3e220f"/><ellipse cx="78" cy="66" rx="16" ry="23" transform="rotate(20 78 66)" fill="#7a4a2a"/><path d="M84 47c-8 10-4 28-12 38" fill="none" stroke="#3e220f"/>`),
+  fragola: sv(`<path d="M60 104C34 88 26 60 34 46c8-12 44-12 52 0 8 14 0 42-26 58z" fill="#e0443e"/><path d="M40 44c6-8 12-8 20-2 8-6 14-6 20 2-8 6-32 6-40 0z" fill="#5f9a3a"/><path d="M60 40v-14" fill="none"/>${[[48,58],[60,62],[72,58],[52,74],[68,74],[60,88]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="1.6" ry="2.6" fill="#f7d26b" stroke="none"/>`).join('')}`),
+  limone: sv(`<ellipse cx="60" cy="66" rx="38" ry="28" fill="#f4d23c"/><path d="M22 66c-6-2-6 2 0 0M98 66c6 2 6-2 0 0" fill="none"/><path d="M60 38c4-10 14-14 22-12-2 8-10 14-22 12z" fill="#6aa043"/>`),
+  bergamotto: sv(`<circle cx="60" cy="66" r="34" fill="#c4d74a"/><circle cx="50" cy="56" r="3" fill="#a8bd36" stroke="none"/><circle cx="68" cy="74" r="3" fill="#a8bd36" stroke="none"/><path d="M60 32c4-10 14-14 22-12-2 8-10 14-22 12z" fill="#4f8a32"/>`),
+  arancia: sv(`<circle cx="60" cy="66" r="34" fill="#f39a2b"/><circle cx="50" cy="56" r="3" fill="#e0861a" stroke="none"/><circle cx="70" cy="76" r="3" fill="#e0861a" stroke="none"/><path d="M60 32c4-10 14-14 22-12-2 8-10 14-22 12z" fill="#4f8a32"/>`),
+  mandorla: sv(`<path d="M60 20c22 18 26 52 16 74-6 10-26 10-32 0-10-22-6-56 16-74z" fill="#c98b52"/><path d="M60 30c-4 20-4 46 0 64" fill="none" stroke="#a96d38" stroke-width="2.5"/>`),
+  cocco: sv(`<circle cx="60" cy="64" r="36" fill="#7a5233"/><path d="M28 60a32 32 0 0 1 64 0z" fill="#fbf7ee"/><path d="M34 60a26 26 0 0 1 52 0" fill="none" stroke="#e8e0cc" stroke-width="2"/>`),
+  mela: sv(`<path d="M60 44c-14-10-36-4-36 22 0 24 18 40 36 34 18 6 36-10 36-34 0-26-22-32-36-22z" fill="#d94a3c"/><path d="M60 44c0-10 2-16 6-22" fill="none"/><path d="M64 34c8-8 18-6 22-2-8 8-16 6-22 2z" fill="#6aa043"/>`),
+  pera: sv(`<path d="M60 26c10 0 12 14 14 24 2 8 18 18 18 34 0 16-14 22-32 22s-32-6-32-22c0-16 16-26 18-34 2-10 4-24 14-24z" fill="#c8d65a"/><path d="M60 26c0-6 2-10 6-14" fill="none"/><path d="M64 20c8-6 16-4 20 0-8 6-14 4-20 0z" fill="#6aa043"/>`),
+  melograno: sv(`<circle cx="60" cy="68" r="34" fill="#c4323b"/><path d="M50 36l4-10 6 8 6-8 4 10z" fill="#c4323b"/>${[[48,62],[60,58],[72,62],[54,74],[66,74],[60,86],[44,78],[76,78]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="4" fill="#f07e86" stroke="none"/>`).join('')}`),
+  fico: sv(`<path d="M60 22c6 0 8 10 14 18 10 12 18 24 14 40-4 16-16 24-28 24s-24-8-28-24c-4-16 4-28 14-40 6-8 8-18 14-18z" fill="#6d3f6e"/><path d="M60 22v-8" fill="none"/><ellipse cx="60" cy="78" rx="14" ry="12" fill="#e2668a" stroke="none" opacity=".8"/>`),
+  castagna: sv(`<path d="M60 30c26 0 40 22 34 44-4 16-18 26-34 26s-30-10-34-26c-6-22 8-44 34-44z" fill="#7b4424"/><path d="M28 82c10 10 54 10 64 0" fill="none" stroke="#e7d2a8" stroke-width="6"/><path d="M60 30c-2-6 0-10 4-12" fill="none"/>`),
+  zucca: sv(`<ellipse cx="60" cy="70" rx="40" ry="30" fill="#ee8a2a"/><path d="M60 40v60M42 44c-8 16-8 40 0 54M78 44c8 16 8 40 0 54" fill="none" stroke="#c96a14" stroke-width="2.5"/><path d="M58 40c0-8 2-12 8-16" fill="none" stroke-width="4"/>`),
+  mirtillo: sv(`${[[46,62,16],[72,58,14],[60,82,16]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#4a5aa8"/><path d="M${x-4} ${y-r+4}l4 3 4-3" fill="none" stroke="#2f3a78" stroke-width="2"/>`).join('')}`),
+  frutti_bosco: sv(`<circle cx="44" cy="70" r="16" fill="#4a5aa8"/><path d="M72 46c14 0 20 16 16 30-4 12-14 18-22 14-10-4-14-18-10-30 2-8 8-14 16-14z" fill="#c4325a"/>${[[66,58],[76,62],[70,72],[80,74],[74,84]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.2" fill="#e05a7a" stroke="none"/>`).join('')}<path d="M70 44c2-8 8-12 14-12" fill="none"/>`),
+  banana: sv(`<path d="M28 44c8 36 40 56 70 42 4-2 4-8 0-8-26 8-50-8-60-36-2-6-12-4-10 2z" fill="#f4d23c"/><path d="M30 40l-4-8" fill="none" stroke-width="5"/>`),
+  liquirizia: sv(`${[[38,0],[54,-6],[70,4],[86,-4]].map(([x,r])=>`<rect x="${x-5}" y="28" width="10" height="72" rx="4" transform="rotate(${r} ${x} 64)" fill="#3a2a22"/>`).join('')}`),
+  menta: sv(`<path d="M60 102V40" fill="none"/><path d="M60 60c-20 0-30-14-30-26 14 0 30 10 30 26z" fill="#5fae5a"/><path d="M60 52c20 0 30-14 30-26-14 0-30 10-30 26z" fill="#4f9a4a"/><path d="M60 82c-20 0-30-14-30-26 14 0 30 10 30 26z" fill="#6fbe6a"/><path d="M60 74c20 0 30-14 30-26-14 0-30 10-30 26z" fill="#5fae5a"/>`),
+  vaniglia: sv(`<path d="M40 104c10-30 14-60 30-84" fill="none" stroke="#3e2a1a" stroke-width="5"/><path d="M50 104c8-28 16-56 34-80" fill="none" stroke="#5a3d24" stroke-width="5"/><circle cx="82" cy="30" r="12" fill="#fbf3dd"/><circle cx="82" cy="30" r="4" fill="#f2c14e" stroke="none"/>`),
+  cannella: sv(`${[[44,-10],[60,0],[76,10]].map(([x,r])=>`<g transform="rotate(${r} ${x} 64)"><rect x="${x-7}" y="26" width="14" height="76" rx="6" fill="#a8622e"/><path d="M${x-3} 30v68" fill="none" stroke="#7a4318" stroke-width="2"/></g>`).join('')}`),
+  miele: sv(`<path d="M36 44h48l6 50c0 6-4 10-10 10H40c-6 0-10-4-10-10z" fill="#f2b42c"/><rect x="34" y="34" width="52" height="12" rx="4" fill="#d9e4c8"/><path d="M44 60c4 10 8 10 12 0 4 10 8 10 12 0" fill="none" stroke="#c98a10" stroke-width="2.5"/>`),
+  ricotta: sv(`<path d="M24 62h72l-8 36c-1 4-4 6-8 6H40c-4 0-7-2-8-6z" fill="#d9e4c8"/><path d="M28 62c0-18 14-30 32-30s32 12 32 30z" fill="#fbf7ee"/><circle cx="48" cy="50" r="3" fill="#ece4d0" stroke="none"/><circle cx="68" cy="46" r="3" fill="#ece4d0" stroke="none"/>`),
+  formaggio: sv(`<path d="M22 84l76-30v34c0 4-2 6-6 6H28c-4 0-6-2-6-6z" fill="#f2cf6a"/><path d="M22 84l76-30-34-14z" fill="#f7dd8a"/><circle cx="46" cy="90" r="5" fill="#d9a83a" stroke="none"/><circle cx="74" cy="80" r="4" fill="#d9a83a" stroke="none"/>`),
+  stracciatella: sv(`<path d="M30 70c0-20 14-34 30-34s30 14 30 34c0 18-14 30-30 30S30 88 30 70z" fill="#fbf7ee"/>${[[46,60],[64,54],[72,72],[52,80],[60,68]].map(([x,y],i)=>`<path d="M${x} ${y}l6 -3 3 5 -6 3z" fill="#4a2a14" stroke="none" transform="rotate(${i*30} ${x} ${y})"/>`).join('')}`),
+  anguria: sv(`<path d="M18 52h84c0 28-20 46-42 46S18 80 18 52z" fill="#3f8a3a"/><path d="M24 52h72c0 22-16 38-36 38S24 74 24 52z" fill="#e8504a"/>${[[46,64],[60,70],[74,64],[54,78],[68,78]].map(([x,y])=>`<ellipse cx="${x}" cy="${y}" rx="2" ry="3.4" fill="#2a1a12" stroke="none"/>`).join('')}`),
+  pesca: sv(`<circle cx="60" cy="68" r="34" fill="#f4a06a"/><path d="M60 36c-8 18-8 46 0 64" fill="none" stroke="#e0784a" stroke-width="2.5"/><path d="M62 36c6-10 16-12 22-10-4 8-12 12-22 10z" fill="#6aa043"/>`),
+  mango: sv(`<path d="M30 70c-4-26 20-46 44-40s28 34 16 52-56 14-60-12z" fill="#f4b23a"/><path d="M38 76c6 14 30 18 44 6" fill="none" stroke="#e0861a" stroke-width="2.5"/><path d="M76 32c4-8 12-10 18-8-4 6-10 10-18 8z" fill="#6aa043"/>`),
+  uva: sv(`${[[46,46],[60,44],[74,46],[52,60],[68,60],[60,74],[46,74],[74,74],[60,88]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="9" fill="#7a3e8a"/>`).join('')}<path d="M60 34v-12" fill="none"/>`),
+  ciliegia: sv(`<circle cx="44" cy="80" r="16" fill="#b8202e"/><circle cx="76" cy="84" r="16" fill="#c8303a"/><path d="M44 64c4-20 14-34 24-40M76 68c-2-20-4-34-8-44" fill="none"/><path d="M68 24c8-6 18-4 22 2-8 6-16 4-22-2z" fill="#6aa043"/>`),
+  yogurt: sv(`<path d="M34 46h52l-6 50c-1 4-4 6-8 6H48c-4 0-7-2-8-6z" fill="#fbf7ee"/><path d="M30 40h60v8H30z" fill="#8bb04a"/><path d="M42 64c8-4 28-4 36 0" fill="none" stroke="#d9e4c8" stroke-width="2.5"/>`),
+  pomodoro: sv(`<circle cx="60" cy="68" r="32" fill="#e04a34"/><path d="M44 40l8 6 8-10 8 10 8-6-6 12H50z" fill="#4f8a32"/>`),
+  gelato: sv(`<path d="M40 60l20 46 20-46z" fill="#e8b46a"/><path d="M44 66h32M48 76h24" fill="none" stroke="#c98a3a" stroke-width="2"/><circle cx="60" cy="46" r="22" fill="#fbf3dd"/><circle cx="48" cy="56" r="8" fill="#fbf3dd"/><circle cx="72" cy="56" r="8" fill="#fbf3dd"/>`)
+};
+// Gusto → illustrazione (il primo ingrediente che compare nel nome vince)
+const ILL_REGOLE = [
+  [/pistacch/i,'pistacchio'],[/stracciatell/i,'stracciatella'],[/nocciol|gianduia/i,'nocciola'],[/fave di cacao|cacao/i,'cacao'],
+  [/cioccolat|fondente|sacher/i,'cioccolato'],[/zabaion|crema|tuorl/i,'crema'],[/caff[eè]|espresso/i,'caffe'],[/fragol/i,'fragola'],
+  [/bergamott/i,'bergamotto'],[/limon/i,'limone'],[/arancia|arance|mandarin|clementin/i,'arancia'],[/mandorl/i,'mandorla'],
+  [/torron/i,'mandorla'],[/cocco/i,'cocco'],[/melogran|melagran/i,'melograno'],[/\bmel[ae]\b/i,'mela'],[/\bper[ae]\b/i,'pera'],[/\bfic[oh]/i,'fico'],
+  [/castagn|marron/i,'castagna'],[/zucca/i,'zucca'],[/mirtill/i,'mirtillo'],[/\bmore\b|lampon|frutti di bosco|ribes/i,'frutti_bosco'],
+  [/banan/i,'banana'],[/liquiriz/i,'liquirizia'],[/menta/i,'menta'],[/vanigli/i,'vaniglia'],[/cannell/i,'cannella'],[/miele/i,'miele'],
+  [/ricotta/i,'ricotta'],[/grana|padano|parmigian|pecorino|formagg|gorgonzol/i,'formaggio'],[/anguria|cocomero/i,'anguria'],
+  [/pesca|pesche|albicocc/i,'pesca'],[/mango|maracuja|passion/i,'mango'],[/\buva\b/i,'uva'],[/ciliegi|amarena/i,'ciliegia'],
+  [/yogurt/i,'yogurt'],[/pomodor/i,'pomodoro'],[/fior di latte|latte|panna|bianco/i,'latte']
+];
+// vince l'ingrediente scritto per primo nel nome (es. "Zucca, mandorla e cannella" → zucca)
+function illustrazionePer(nome){
+  let best = null;
+  ILL_REGOLE.forEach(([re, k], ordine) => { const m = String(nome || '').match(re); if (m && (!best || m.index < best.i)) best = { i: m.index, k }; });
+  return best ? best.k : 'gelato';
+}
+
+// Nome inglese automatico: frasi lunghe prima, poi parole singole. Si può sempre correggere a mano.
+const EN_FRASI = [
+  ['fior di latte','Fior di latte (sweet cream)'],['fave di cacao','cocoa beans'],['grana padano','Grana Padano'],
+  ['pomodori secchi','sun-dried tomatoes'],['frutti di bosco','wild berries'],['confettura di more','blackberry jam'],
+  ['cioccolato fondente','dark chocolate'],['cioccolato al latte','milk chocolate'],['crema di nocciola','hazelnut cream'],
+  ['torrone bianco','White nougat'],['della tuscia','from Tuscia'],['di reggio calabria','from Reggio Calabria'],['di zagarolo','from Zagarolo'],
+  ['di bronte','from Bronte'],['di pantelleria','from Pantelleria'],['dop calabria','PDO Calabria'],['d\'amare','to love']
+];
+const EN_PAROLE = { pistacchio:'Pistachio', nocciola:'Hazelnut', cioccolato:'Chocolate', cioccolata:'Chocolate', fondente:'Dark',
+  crema:'Custard', zabaione:'Zabaglione', caffe:'Coffee', 'caffè':'Coffee', stracciatella:'Stracciatella (chocolate chip)', fragola:'Strawberry',
+  limone:'Lemon', mandorla:'Almond', cocco:'Coconut', mela:'Apple', pera:'Pear', cannella:'Cinnamon', melagrana:'Pomegranate',
+  melograno:'Pomegranate', liquirizia:'Licorice', castagna:'Chestnut', zucca:'Pumpkin', bergamotto:'Bergamot', fico:'Fig', fichi:'Figs',
+  ricotta:'Ricotta', burro:'Butter', confettura:'jam', more:'blackberries', mirtillo:'Blueberry', mirtilli:'Blueberries', lampone:'Raspberry',
+  lamponi:'Raspberries', arancia:'Orange', banana:'Banana', mango:'Mango', pesca:'Peach', albicocca:'Apricot', anguria:'Watermelon',
+  melone:'Melon', uva:'Grape', ciliegia:'Cherry', amarena:'Sour cherry', menta:'Mint', vaniglia:'Vanilla', miele:'Honey', yogurt:'Yogurt',
+  cacao:'Cocoa', latte:'Milk', panna:'Cream', capperi:'capers', pomodori:'tomatoes', variegato:'swirled', autunno:'Autumn', inverno:'Winter',
+  estate:'Summer', primavera:'Spring', trinitario:'Trinitario', williams:'Williams', gianduia:'Gianduja', zenzero:'Ginger', curcuma:'Turmeric',
+  noci:'Walnuts', torrone:'Nougat', noce:'Walnut', sesamo:'Sesame', olio:'Oil', oliva:'Olive', extravergine:'Extra virgin', matcha:'Matcha', tè:'Tea', te:'Tea',
+  e:'&', con:'with', di:'of', al:'with', alla:'with', allo:'with', ai:'with', dop:'PDO', igp:'PGI', bio:'organic', rosso:'red', bianco:'white', nero:'black' };
+function nomeInglese(it) {
+  let s = ' ' + String(it || '').toLowerCase().replace(/["“”]/g, '') + ' ';
+  const tenuti = [];   // le frasi già tradotte non vanno ritradotte parola per parola
+  EN_FRASI.forEach(([a, b]) => { s = s.split(' ' + a + ' ').join(' §' + (tenuti.push(b) - 1) + '§ '); });
+  const out = s.trim().split(/\s+/).map(w => {
+    const t = w.match(/^§(\d+)§$/); if (t) return tenuti[+t[1]];
+    const pul = w.replace(/[^a-zàèéìòù'&()-]/gi, '');
+    if (EN_PAROLE[pul] !== undefined) return EN_PAROLE[pul];
+    return w;
+  }).join(' ').replace(/\s+/g, ' ').trim();
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+// Nome italiano ben scritto: "PISTACCHIO" → "Pistacchio", "nocciola della tuscia" → "Nocciola della Tuscia"
+function nomeItaliano(n) {
+  const piccole = new Set(['di','del','della','delle','dei','e','con','al','alla','allo','ai','d','in','da']);
+  const sigle = new Set(['dop','igp','bio','dpo']);
+  return String(n || '').toLowerCase().split(/\s+/).map((w, i) => {
+    if (sigle.has(w)) return w.toUpperCase();
+    if (i > 0 && (piccole.has(w) || /^d'/.test(w))) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+const CLAIM_SCELTE = ['',
+ 'Fa bene: la vitamina B6 contribuisce alla normale funzione del sistema nervoso.',
+ 'Fa bene: la vitamina B6 contribuisce alla normale funzione psicologica.',
+ 'Fa bene: la vitamina E contribuisce alla protezione delle cellule dallo stress ossidativo.',
+ 'Fa bene: il manganese contribuisce alla protezione delle cellule dallo stress ossidativo.',
+ 'Fa bene: il rame contribuisce alla protezione delle cellule dallo stress ossidativo.',
+ 'Fa bene: il magnesio contribuisce alla riduzione della stanchezza e dell\'affaticamento.',
+ 'Fa bene: la vitamina C contribuisce alla protezione delle cellule dallo stress ossidativo.',
+ 'Fa bene: l\'acido alfa-linolenico contribuisce al mantenimento di livelli normali di colesterolo nel sangue (effetto con 2 g al giorno).'];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const chiave = n => String(n || '').trim().toUpperCase();
+let RICETTE = [], VOCI = {}, FOTO = {}, SEL = new Set(), VISTA = 'coda', db = null, LOGO_GREED = null;
+
+// ── Dati dell'etichetta: automatici dalla ricetta, correggibili a mano ──
+function datiEtichetta(r) {
+  const v = VOCI[chiave(r.nome)] || {};
+  const al = allergeniRicetta(r);
+  const testoIng = (r.ingredienti || []).map(i => String(i.nome || '').toLowerCase()).join(' ');
+  const vegan = v.vegan !== undefined ? v.vegan : (!al.includes('LATTE') && !al.includes('UOVA') && !/miele|gelatina|carminio|cocciniglia/.test(testoIng));
+  return { it: v.it || nomeItaliano(r.nome), en: v.en || nomeInglese(r.nome), img: v.img || illustrazionePer(r.nome),
+           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null };
+}
+
+// ── Sagoma vintage (mm): cupola in alto, angoli intagliati, doppia cornice ──
+function sagomaSvg() {
+  const P = (o) => { // o = rientro dal bordo
+    const L = 2 + o, R = 70 - o, T = 2 + o, B = 103 - o, n = 4.2 - o * 0.25, c = 17 - o * 0.4;
+    return `M ${L} ${T + c + 8} L ${L} ${B - n} Q ${L + n} ${B - n} ${L + n} ${B} L ${R - n} ${B} Q ${R - n} ${B - n} ${R} ${B - n} L ${R} ${T + c + 8}
+      Q ${R - n} ${T + c + 8} ${R - n} ${T + c + 8 - n} L ${R - n} ${T + c} C ${R - 9} ${T + c - 1} ${R - 12} ${T + 6} ${36 + 13 - o * .3} ${T + 4}
+      C ${36 + 6} ${T + o * .2} ${36 - 6} ${T + o * .2} ${36 - 13 + o * .3} ${T + 4} C ${L + 12} ${T + 6} ${L + 9} ${T + c - 1} ${L + n} ${T + c}
+      L ${L + n} ${T + c + 8 - n} Q ${L + n} ${T + c + 8} ${L} ${T + c + 8} Z`;
+  };
+  return `<svg class="sagoma" viewBox="0 0 72 105" xmlns="http://www.w3.org/2000/svg">
+    <path d="${P(0)}" fill="#fbf5e8" stroke="#1d2a1a" stroke-width=".55"/>
+    <path d="${P(1.6)}" fill="none" stroke="#d4572e" stroke-width=".4"/></svg>`;
+}
+// ── Icone allergeni (stile linea) ──
+const ICO = {
+  VEGAN: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19c3-4 6-7 10-10"/></svg>',
+  LATTE: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6" stroke-linejoin="round"><path d="M9 3h6v3l2 3v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V9l2-3z"/><path d="M7 12h10"/></svg>',
+  'FRUTTA A GUSCIO': '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3c5 3 7 8 5 13-1 3-3 5-5 5s-4-2-5-5C5 11 7 6 12 3z"/><path d="M12 6v13"/></svg>',
+  UOVA: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><path d="M12 3c4 0 7 6 7 11a7 7 0 0 1-14 0c0-5 3-11 7-11z"/></svg>',
+  SOIA: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><path d="M6 18c-2-4 2-12 8-13 4 0 6 4 3 8-2 3-7 8-11 5z"/><circle cx="11" cy="12" r="1.6"/><circle cx="14.5" cy="8.5" r="1.6"/></svg>',
+  ARACHIDI: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><path d="M9 4a4 4 0 0 1 6 1c1 2-1 3 0 5s3 3 2 6-5 5-8 3-3-5-2-7 1-3 0-5 0-3 2-3z"/></svg>',
+  SESAMO: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><ellipse cx="9" cy="10" rx="2.5" ry="4" transform="rotate(-20 9 10)"/><ellipse cx="15" cy="14" rx="2.5" ry="4" transform="rotate(20 15 14)"/></svg>',
+  SOLFITI: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6" stroke-linejoin="round"><path d="M8 3h8l-1 7a3 3 0 0 1-6 0z"/><path d="M12 13v7M9 20h6"/></svg>',
+  GLUTINE: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><path d="M12 21V8M12 8c-3-1-4-4-3-6 2 1 3 3 3 6zm0 0c3-1 4-4 3-6-2 1-3 3-3 6z"/></svg>',
+  ALTRO: '<svg viewBox="0 0 24 24" fill="none" stroke="#1d2a1a" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><path d="M12 8v5M12 16v.5"/></svg>'
+};
+const EN_ALL = { LATTE:'MILK', 'FRUTTA A GUSCIO':'TREE NUTS', UOVA:'EGGS', SOIA:'SOY', ARACHIDI:'PEANUTS', SESAMO:'SESAME', SOLFITI:'SULPHITES',
+  GLUTINE:'GLUTEN', PESCE:'FISH', CROSTACEI:'CRUSTACEANS', MOLLUSCHI:'MOLLUSCS', SEDANO:'CELERY', SENAPE:'MUSTARD', LUPINI:'LUPIN' };
+function etichettaHtml(d) {
+  // dimensione del nome: la parola più lunga deve stare nella riga (55 mm), e al massimo 3 righe
+  const parole = d.it.split(/\s+/), lunga = Math.max(...parole.map(p => p.length));
+  let fs = Math.min(11, 55 / (0.37 * lunga));
+  const stimaRighe = f => { let r = 1, l = 0; parole.forEach(p => { const w = p.length * 0.37 * f + (l ? 0.25 * f : 0); if (l + w > 55) { r++; l = p.length * 0.37 * f; } else l += w; }); return r; };
+  while (stimaRighe(fs) > 2 && fs > 5.2) fs -= 0.3;
+  const fsEn = d.en.length <= 24 ? 4.2 : d.en.length <= 40 ? 3.6 : 3.1;
+  const foto = d.foto ? `<img src="${d.foto}" alt="">` : (ILL[d.img] || ILL.gelato);
+  const icone = [];
+  if (d.vegan) icone.push(`<div class="ico"><div class="tondo">${ICO.VEGAN}</div><div class="tx">VEGAN</div></div>`);
+  d.al.forEach(a => icone.push(`<div class="ico"><div class="tondo">${ICO[a] || ICO.ALTRO}</div><div class="tx">${esc(a)}<br><span>${esc(EN_ALL[a] || '')}</span></div></div>`));
+  const iconeHtml = icone.slice(0, 3).join('<div class="sep"></div>') + (icone.length > 3 ? `<div class="tx" style="font-family:Montserrat;font-size:1.8mm;font-weight:700">+${icone.length - 3}</div>` : '');
+  return `<div class="eti">${sagomaSvg()}
+    <div class="logo">${typeof LOGO_GREED !== 'undefined' && LOGO_GREED ? `<img src="${LOGO_GREED}" alt="GREED">` : 'GREED'}</div>
+    <div class="sotto-logo">GELATO NATURALE</div><div class="orn">❦</div>
+    <div class="corpo">
+      <div class="it" style="font-size:${fs.toFixed(2)}mm">${esc(d.it)}</div>
+      <div class="en" style="font-size:${fsEn}mm">${esc(d.en)}</div>
+      <div class="img">${foto}</div>
+      ${d.claim ? `<div class="claim">${esc(d.claim)}</div>` : ''}
+      <div class="icone">${iconeHtml}</div>
+    </div></div>`;
+}
+function render() {
+  const coda = RICETTE.filter(r => !datiEtichetta(r).stampata);
+  document.getElementById('ncoda').textContent = coda.length;
+  document.getElementById('ntutti').textContent = RICETTE.length;
+  document.getElementById('nsel').textContent = SEL.size;
+  const lista = VISTA === 'coda' ? coda : RICETTE;
+  const g = document.getElementById('griglia');
+  if (!lista.length) { g.innerHTML = `<div class="stato">${VISTA === 'coda' ? 'Nessun gusto nuovo da stampare. 👍' : 'Nessuna ricetta trovata nel gestionale.'}</div>`; return; }
+  const opzImg = Object.keys(ILL).map(k => `<option value="${k}">${k.replace('_', ' ')}</option>`).join('');
+  g.innerHTML = lista.map(r => {
+    const d = datiEtichetta(r), k = chiave(r.nome);
+    return `<div class="scheda ${SEL.has(k) ? 'sel' : ''}">
+      <div class="anteprima"><div class="anteprima-box">${etichettaHtml(d)}</div></div>
+      <div class="campi">
+        <div>${d.stampata ? `<span class="chip">stampata ${new Date(d.stampata).toLocaleDateString('it-IT')}</span>` : '<span class="chip nuovo">da stampare</span>'}
+          <label style="float:right;text-transform:none;font-size:12px"><input type="checkbox" ${SEL.has(k) ? 'checked' : ''} onchange="toggleSel('${esc(k)}',this.checked)" style="width:auto"> stampa</label></div>
+        <label>Nome italiano</label><input value="${esc(d.it)}" onchange="salvaVoce('${esc(k)}','it',this.value)">
+        <label>Nome inglese</label><input value="${esc(d.en)}" onchange="salvaVoce('${esc(k)}','en',this.value)">
+        <label>Immagine</label><select onchange="salvaVoce('${esc(k)}','img',this.value)">${opzImg.replace(`value="${d.img}"`, `value="${d.img}" selected`)}</select>
+        <label>Vegan</label><select onchange="salvaVoce('${esc(k)}','vegan',this.value==='si')"><option value="si" ${d.vegan ? 'selected' : ''}>Sì</option><option value="no" ${!d.vegan ? 'selected' : ''}>No</option></select>
+        <label>Claim (solo se la Linea Mente lo consente)</label><select onchange="salvaVoce('${esc(k)}','claim',this.value)">${CLAIM_SCELTE.map(c => `<option value="${esc(c)}" ${c === d.claim ? 'selected' : ''}>${c ? esc(c.replace('Fa bene: ', '').slice(0, 70)) + '…' : '— nessuno —'}</option>`).join('')}</select>
+        <label>Foto dell'ingrediente</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <label class="b-verde" style="padding:6px 10px;border-radius:6px;color:#fff;text-transform:none;font-size:12px;cursor:pointer">📷 ${d.foto ? 'Cambia foto' : 'Carica foto'}<input type="file" accept="image/*" style="display:none" onchange="caricaFoto('${esc(k)}',this.files[0])"></label>
+          <button type="button" style="padding:6px 10px;font-size:12px;background:#eef2ea;color:#2d6a4f" onclick="copiaPrompt('${esc(k)}')">📋 Testo per Canva</button>
+          ${d.foto ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliFoto('${esc(k)}')">Togli</button>` : ''}
+        </div>
+        <div class="stato">Allergeni presi dalla ricetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
+      </div></div>`;
+  }).join('');
+}
+function vista(v) { VISTA = v; document.getElementById('t-coda').classList.toggle('on', v === 'coda'); document.getElementById('t-tutti').classList.toggle('on', v === 'tutti'); render(); }
+function toggleSel(k, on) { on ? SEL.add(k) : SEL.delete(k); render(); }
+function selezionaCoda() { RICETTE.filter(r => !datiEtichetta(r).stampata).forEach(r => SEL.add(chiave(r.nome))); render(); }
+async function salvaVoce(k, campo, valore) {
+  VOCI[k] = { ...(VOCI[k] || {}), [campo]: valore }; render();
+  try { await db.collection('config').doc('etichette').set({ voci: { [k]: { [campo]: valore } } }, { merge: true }); }
+  catch (e) { document.getElementById('msg').textContent = '⚠️ Non salvato: ' + e.message; }
+}
+// ── Foto: ridotta a 900 px e salvata una volta per sempre (raccolta etichette_foto) ──
+function riduci(file) {
+  return new Promise((ok, ko) => {
+    const img = new Image(); img.onload = () => {
+      const s = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      const x = c.getContext('2d'); x.fillStyle = '#fbf5e8'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.86));
+    }; img.onerror = () => ko(new Error('Immagine non leggibile')); img.src = URL.createObjectURL(file);
+  });
+}
+async function caricaFoto(k, file) {
+  if (!file) return;
+  try { const url = await riduci(file); FOTO[k] = url; render(); await db.collection('etichette_foto').doc(encodeURIComponent(k)).set({ img: url, ts: Date.now() }); }
+  catch (e) { document.getElementById('msg').textContent = '⚠️ Foto non salvata: ' + e.message; }
+}
+async function togliFoto(k) { delete FOTO[k]; render(); try { await db.collection('etichette_foto').doc(encodeURIComponent(k)).delete(); } catch (e) {} }
+// Testo sempre uguale per avere foto coerenti tra loro
+function copiaPrompt(k) {
+  const r = RICETTE.find(x => chiave(x.nome) === k); if (!r) return;
+  const testo = `Foto realistica di ${nomeItaliano(r.nome)} (gli ingredienti principali del gusto, freschi e naturali, composti in modo elegante al centro), sfondo beige chiaro uniforme a tinta unita, luce naturale morbida dall'alto a sinistra, ombra leggera, stile fotografia gastronomica per etichetta di gelateria, nessun testo, nessun piatto, formato quadrato.`;
+  (navigator.clipboard ? navigator.clipboard.writeText(testo) : Promise.reject()).then(
+    () => { document.getElementById('msg').textContent = '📋 Testo copiato: incollalo nel generatore di immagini di Canva.'; },
+    () => prompt('Copia questo testo:', testo));
+}
+async function caricaLogo(file) {
+  if (!file) return;
+  const url = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(file); });
+  LOGO_GREED = url; render();
+  try { await db.collection('config').doc('etichette').set({ logo: url }, { merge: true }); } catch (e) { document.getElementById('msg').textContent = '⚠️ Logo non salvato: ' + e.message; }
+}
+async function stampa() {
+  const scelte = RICETTE.filter(r => SEL.has(chiave(r.nome)));
+  if (!scelte.length) { alert('Seleziona almeno un gusto (oppure premi "Seleziona da stampare").'); return; }
+  const fogli = [];
+  for (let i = 0; i < scelte.length; i += 8) fogli.push('<div class="foglio">' + scelte.slice(i, i + 8).map(r => etichettaHtml(datiEtichetta(r))).join('') + '</div>');
+  document.getElementById('fogli').innerHTML = fogli.join('');
+  await document.fonts.ready; window.print();
+  if (confirm(`Stampate ${scelte.length} etichette su ${fogli.length} fogli A4.\nLe segno come stampate, così escono dalla lista "Da stampare"?`)) {
+    const ora = Date.now(), agg = {};
+    scelte.forEach(r => { const k = chiave(r.nome); VOCI[k] = { ...(VOCI[k] || {}), stampata: ora }; agg[k] = { stampata: ora }; });
+    SEL.clear(); render();
+    try { await db.collection('config').doc('etichette').set({ voci: agg }, { merge: true }); } catch (e) {}
+  }
+}
+// ── Avvio: login, ricette dal gestionale (aggiornate in tempo reale), impostazioni etichette ──
+function avvia() {
+  firebase.initializeApp({ apiKey:"AIzaSyBwAZb_A3IjPv7iL0cLhVnWO-Cuw_DD5g4", authDomain:"club-greed.firebaseapp.com", projectId:"club-greed",
+    storageBucket:"club-greed.firebasestorage.app", messagingSenderId:"704669833762", appId:"1:704669833762:web:917f4c7b104bc8ad39087b" }, 'etichette');
+  const app = firebase.app('etichette'); db = app.firestore();
+  app.auth().onAuthStateChanged(u => {
+    const ok = u && ['gelateriagreed@gmail.com', 'team.greedfrascati@gmail.com'].includes(u.email);
+    document.getElementById('login').style.display = ok ? 'none' : 'block';
+    document.getElementById('app').style.display = ok ? 'block' : 'none';
+    if (u && !ok) { document.getElementById('loginErr').textContent = 'Account ' + u.email + ' non autorizzato.'; app.auth().signOut(); }
+    if (!ok) return;
+    document.getElementById('utente').textContent = u.email;
+    db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; render(); });
+    db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; s.forEach(d => { FOTO[decodeURIComponent(d.id)] = d.data().img; }); render(); });
+    db.collection('ricette_lab').onSnapshot(s => {
+      RICETTE = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome))
+        .sort((a, b) => nomeItaliano(a.nome).localeCompare(nomeItaliano(b.nome), 'it'));
+      render();
+    }, e => { document.getElementById('msg').textContent = '⚠️ ' + e.message; });
+  });
+  window.accedi = () => { const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' }); app.auth().signInWithPopup(p).catch(e => { document.getElementById('loginErr').textContent = e.message; }); };
+}
+if (!window.__PROVA) avvia();
+</script></body></html>
