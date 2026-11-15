@@ -43,13 +43,13 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
 .eti .img{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;margin:1.2mm 0}
 .eti .img img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
 .eti .img svg{height:100%;max-width:100%}
-.eti .icone{display:flex;flex-shrink:0;justify-content:center;align-items:center;gap:2.4mm}
+.eti .icone{display:flex;flex-wrap:wrap;flex-shrink:0;justify-content:center;align-items:center;gap:1.8mm 3mm}
 .eti .ico{display:flex;align-items:center;gap:1.4mm}
-.eti .ico .tondo{width:7.2mm;height:7.2mm;border:.32mm solid #1d2a1a;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.eti .ico .tondo svg{width:4.6mm;height:4.6mm}
-.eti .ico .tx{font-family:'Montserrat',sans-serif;font-weight:700;font-size:2.05mm;line-height:1.25;letter-spacing:.03em;color:#1d2a1a;text-align:left}
+.eti .ico .tondo{width:8.6mm;height:8.6mm;flex-shrink:0;border:.32mm solid #1d2a1a;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.eti .ico .tondo svg{width:5.6mm;height:5.6mm}
+.eti .ico .tx{font-family:'Montserrat',sans-serif;font-weight:700;font-size:2.45mm;line-height:1.2;letter-spacing:.03em;color:#1d2a1a;text-align:left;white-space:nowrap}
 .eti .ico .tx span{font-weight:600;opacity:.85}
-.eti .sep{width:.25mm;height:6mm;background:#1d2a1a;opacity:.35}
+.eti .sep{width:.25mm;height:7mm;background:#1d2a1a;opacity:.35}
 .eti .claim{flex-shrink:0;margin-bottom:1.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-style:italic;font-size:2.3mm;line-height:1.25;color:#3b4a32}
 /* ── STAMPA: A4 orizzontale, 8 etichette (4 × 2) ── */
 #fogli{display:none}
@@ -277,12 +277,13 @@ function etichettaHtml(d) {
   let fs = Math.min(11, 55 / (0.37 * lunga));
   const stimaRighe = f => { let r = 1, l = 0; parole.forEach(p => { const w = p.length * 0.37 * f + (l ? 0.25 * f : 0); if (l + w > 55) { r++; l = p.length * 0.37 * f; } else l += w; }); return r; };
   while (stimaRighe(fs) > 2 && fs > 5.2) fs -= 0.3;
-  const fsEn = d.en.length <= 24 ? 4.2 : d.en.length <= 40 ? 3.6 : 3.1;
+  const fsEn = d.en.length <= 24 ? 4.8 : d.en.length <= 40 ? 4.2 : 3.6;
   const foto = d.foto ? `<img src="${d.foto}" alt="">` : (ILL[d.img] || ILL.gelato);
   const icone = [];
   if (d.vegan) icone.push(`<div class="ico"><div class="tondo">${ICO.VEGAN}</div><div class="tx">VEGAN</div></div>`);
   d.al.forEach(a => icone.push(`<div class="ico"><div class="tondo">${ICO[a] || ICO.ALTRO}</div><div class="tx">${esc(a)}<br><span>${esc(EN_ALL[a] || '')}</span></div></div>`));
-  const iconeHtml = icone.slice(0, 3).join('<div class="sep"></div>') + (icone.length > 3 ? `<div class="tx" style="font-family:Montserrat;font-size:1.8mm;font-weight:700">+${icone.length - 3}</div>` : '');
+  // tutti gli allergeni sempre visibili: con più di due simboli vanno su due righe
+  const iconeHtml = icone.join('');
   return `<div class="eti">${sagomaSvg()}
     <div class="logo">${typeof LOGO_GREED !== 'undefined' && LOGO_GREED ? `<img src="${LOGO_GREED}" alt="GREED">` : 'GREED'}</div>
     <div class="sotto-logo">GELATO NATURALE</div><div class="orn">❦</div>
