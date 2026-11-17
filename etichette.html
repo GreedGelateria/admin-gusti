@@ -105,10 +105,25 @@ function allergeniIngrediente(nome){
   const n=String(nome||'');
   return ALLERGENI_REGOLE.filter(a=>a.re.test(n)).map(a=>a.k);
 }
-// Allergeni della ricetta = rilevati dagli ingredienti ∪ quelli scritti a mano nel campo "allergeni"
+// Basi e ingredienti composti (stessi dati del Libro ingredienti): "Base bianca" porta gli allergeni della sua ricetta,
+// un ingrediente composto quelli dei suoi componenti (salvati in ingredienti_composti).
+let BASI_LAB = {}, COMPOSTI_LAB = {};
+const _normLab = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const _slugLab = s => _normLab(s).replace(/ /g, '-').slice(0, 120) || 'x';
+const _eBaseLab = r => r && (r.tipo === 'base' || /^base\b|\bbase\s+(bianca|gialla|latte|frutta|neutra|vegan)/i.test(r.nome));
+const _PRECOMP_ALG = [[/meringa/i, 'albume'], [/bombe|bomba/i, 'tuorlo'], [/pan di spagna/i, 'uova'], [/con[oi]\b.*(senza glutine|gf)|mini ?con|conett/i, 'soia']];
+function testoAllergeniIng(nome, prof = 0) {
+  const b = prof < 2 && BASI_LAB[_normLab(nome)];
+  if (b) return nome + ' ' + (b.ingredienti || []).map(i => testoAllergeniIng(i.nome, prof + 1)).join(' ');
+  const c = COMPOSTI_LAB[_slugLab(nome)];
+  if (c) return nome + (!c.semplice && c.componenti ? ' ' + c.componenti : '');
+  const p = _PRECOMP_ALG.find(([re]) => re.test(nome));
+  return nome + (p ? ' ' + p[1] : '');
+}
+// Allergeni della ricetta = rilevati dagli ingredienti (basi e composti aperti) ∪ quelli scritti a mano nel campo "allergeni"
 function allergeniRicetta(r){
   const set=new Set();
-  (r&&r.ingredienti||[]).forEach(i=>allergeniIngrediente(i.nome).forEach(a=>set.add(a)));
+  (r&&r.ingredienti||[]).forEach(i=>allergeniIngrediente(testoAllergeniIng(i.nome)).forEach(a=>set.add(a)));
   const manuale=String((r&&r.allergeni)||'').toLowerCase();
   const MAN={'latte':'LATTE','uov':'UOVA','glutin':'GLUTINE','guscio':'FRUTTA A GUSCIO','arachid':'ARACHIDI','soia':'SOIA','pesce':'PESCE','crostace':'CROSTACEI','mollusc':'MOLLUSCHI','sedano':'SEDANO','senape':'SENAPE','sesamo':'SESAMO','solfit':'SOLFITI','lupin':'LUPINI'};
   Object.entries(MAN).forEach(([k,v])=>{ if(manuale.includes(k)) set.add(v); });
@@ -393,8 +408,11 @@ function avvia() {
     document.getElementById('utente').textContent = u.email;
     db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; render(); });
     db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; s.forEach(d => { FOTO[decodeURIComponent(d.id)] = d.data().img; }); render(); });
+    db.collection('ingredienti_composti').onSnapshot(s => { COMPOSTI_LAB = {}; s.forEach(d => COMPOSTI_LAB[d.id] = d.data()); render(); }, () => {});
     db.collection('ricette_lab').onSnapshot(s => {
-      RICETTE = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome))
+      const tutte = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && !r.eliminata);
+      BASI_LAB = {}; tutte.filter(_eBaseLab).forEach(r => BASI_LAB[_normLab(r.nome)] = r);
+      RICETTE = tutte.filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome))
         .sort((a, b) => nomeItaliano(a.nome).localeCompare(nomeItaliano(b.nome), 'it'));
       render();
     }, e => { document.getElementById('msg').textContent = '⚠️ ' + e.message; });
