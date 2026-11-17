@@ -38,14 +38,18 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
 .eti .sotto-logo{position:absolute;top:13.4mm;left:0;right:0;text-align:center;font-family:'Montserrat',sans-serif;font-weight:600;font-size:1.9mm;letter-spacing:.22em;padding-left:.22em;color:#1d2a1a}
 .eti .orn{position:absolute;top:15.8mm;left:0;right:0;text-align:center;color:#d4572e;font-size:2.4mm;line-height:1}
 .eti .corpo{position:absolute;top:18.6mm;bottom:7.6mm;left:8.5mm;right:8.5mm;display:flex;flex-direction:column;align-items:center}
-.eti .tit{flex:none;height:18mm;width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.eti .tit{flex:none;min-height:18mm;max-height:34mm;width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .eti .it2{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:600;line-height:1.02;color:#16241a;margin-top:.3mm}
 .eti .basso{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .eti .it{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:62.5%;font-variation-settings:'wdth' 62.5;font-weight:700;line-height:.98;color:#16241a}
 .eti .en{margin-top:.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:500;line-height:1.05;color:#16241a}
-.eti .img{flex:none;height:38mm;width:100%;display:flex;align-items:center;justify-content:center;margin:1mm 0}
-.eti .img img{width:38mm;height:38mm;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
+.eti .img{flex:none;width:100%;display:flex;align-items:center;justify-content:center;margin:1mm 0}
+.eti .img img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
 .eti .img svg{height:100%;max-width:100%}
+.misure{margin-top:4px;font-size:11px} .misure summary{cursor:pointer;color:#6a5a40;font-weight:600}
+.misure .riga{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:6px;margin:4px 0}
+.misure .riga input[type=range]{grid-column:1 / -1;width:100%;min-width:0;padding:0;border:0;margin:1px 0 0} .misure .val{text-align:right;color:#6a6a5a}
+#misureTutte{background:#fff;border:1px solid #d8ccb4;border-radius:8px;padding:6px 10px;max-width:420px}
 .eti .icone{display:flex;flex-wrap:wrap;flex-shrink:0;justify-content:center;align-items:center;gap:1.8mm 3mm}
 .eti .ico{display:flex;align-items:center;gap:1.4mm}
 .eti .ico .tondo{width:8.6mm;height:8.6mm;flex-shrink:0;border:.32mm solid #1d2a1a;border-radius:50%;display:flex;align-items:center;justify-content:center}
@@ -82,6 +86,7 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
       <button class="tab on" id="t-coda" onclick="vista('coda')">🆕 Da stampare (<span id="ncoda">0</span>)</button>
       <button class="tab" id="t-tutti" onclick="vista('tutti')">Tutti i gusti (<span id="ntutti">0</span>)</button>
       <button class="b-verde" id="b-genera" onclick="generaFoto()" style="display:none">✨ Genera foto</button>
+      <details class="misure" id="misureTutte"><summary>📏 Misure di tutte le etichette</summary><div id="cursoriTutte"></div></details>
       <span class="stato" id="msg">I gusti nuovi del gestionale compaiono qui da soli. Quando sono 8 riempiono un foglio A4.</span>
     </div>
     <div class="griglia" id="griglia"></div>
@@ -259,7 +264,7 @@ function datiEtichetta(r) {
   const testoIng = (r.ingredienti || []).map(i => String(i.nome || '').toLowerCase()).join(' ');
   const vegan = v.vegan !== undefined ? v.vegan : (!al.includes('LATTE') && !al.includes('UOVA') && !/miele|gelatina|carminio|cocciniglia/.test(testoIng));
   return { it: v.it || nomeItaliano(r.nome), en: v.en || nomeInglese(r.nome), img: v.img || illustrazionePer(r.nome),
-           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null };
+           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null, mis: v.mis || {} };
 }
 
 // ── Sagoma vintage (mm): cupola in alto, angoli intagliati, doppia cornice ──
@@ -290,6 +295,21 @@ const ICO = {
 };
 const EN_ALL = { LATTE:'MILK', 'FRUTTA A GUSCIO':'TREE NUTS', UOVA:'EGGS', SOIA:'SOY', ARACHIDI:'PEANUTS', SESAMO:'SESAME', SOLFITI:'SULPHITES',
   GLUTINE:'GLUTEN', PESCE:'FISH', CROSTACEI:'CRUSTACEANS', MOLLUSCHI:'MOLLUSCS', SEDANO:'CELERY', SENAPE:'MUSTARD', LUPINI:'LUPIN' };
+// ── Misure regolabili: 100% = normale. Quelle generali valgono per tutte, quelle della singola etichetta si aggiungono. ──
+const MISURE_BASE = { foto: 1, tit: 1, sub: 1, en: 1, al: 1 };
+let MISURE = { ...MISURE_BASE }; const APERTI = new Set();
+const NOMI_MISURE = { foto: 'Foto', tit: 'Nome', sub: 'Nome piccolo', en: 'Inglese', al: 'Allergeni' };
+function cursoriMisure(val, chiamata, campi) {
+  return campi.map(c => { const p = Math.round((val[c] || 1) * 100);
+    return `<div class="riga"><span>${NOMI_MISURE[c]}</span><span class="val">${p}%</span><input type="range" min="60" max="${c === 'foto' ? 140 : 150}" step="5" value="${p}"
+      oninput="this.previousElementSibling.textContent=this.value+'%'" onchange="${chiamata}'${c}',this.value/100)"></div>`; }).join('');
+}
+function misuraEtichetta(k, c, v) { const m = { ...((VOCI[k] || {}).mis || {}), [c]: v }; salvaVoce(k, 'mis', m); }
+async function misuraTutte(c, v) {
+  MISURE = { ...MISURE, [c]: v }; render();
+  try { await db.collection('config').doc('etichette').set({ misure: MISURE }, { merge: true }); }
+  catch (e) { document.getElementById('msg').textContent = '⚠️ Non salvato: ' + e.message; }
+}
 // Divide il nome: parte principale + resto più piccolo. Con "|" decidi tu dove dividere (es. "Burro | e visciole").
 function dividiNome(it) {
   it = String(it || '').trim();
@@ -301,7 +321,7 @@ function dividiNome(it) {
 // Dopo il disegno: se il titolo non sta nel suo spazio fisso, rimpicciolisce le scritte (la foto resta sempre uguale)
 function adattaTitoli(root) {
   (root || document).querySelectorAll('.eti .tit').forEach(t => {
-    for (let i = 0; i < 25 && t.scrollHeight > t.clientHeight + 1; i++)
+    for (let i = 0; i < 30 && (t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1); i++)
       t.querySelectorAll('.it,.it2,.en').forEach(x => { x.style.fontSize = (parseFloat(x.style.fontSize) * 0.94).toFixed(2) + 'mm'; });
   });
   (root || document).querySelectorAll('.eti .basso').forEach(t => {
@@ -312,11 +332,14 @@ function etichettaHtml(d) {
   // nome su due livelli: "Burro e confettura di visciole" → "Burro" grande, "e confettura di visciole" più piccolo
   const [nomeP, nomeS] = dividiNome(d.it);
   const parole = nomeP.split(/\s+/), lunga = Math.max(...parole.map(p => p.length));
+  const G = MISURE, m = d.mis || {}, x = c => (G[c] || 1) * (m[c] || 1);
   let fs = Math.min(11, 55 / (0.37 * lunga));
   const stimaRighe = f => { let r = 1, l = 0; parole.forEach(p => { const w = p.length * 0.37 * f + (l ? 0.25 * f : 0); if (l + w > 55) { r++; l = p.length * 0.37 * f; } else l += w; }); return r; };
   while (stimaRighe(fs) > 2 && fs > 5.2) fs -= 0.3;
-  const fsS = nomeS.length <= 22 ? 5 : nomeS.length <= 40 ? 4.3 : 3.7;
-  const fsEn = d.en.length <= 24 ? 4.8 : d.en.length <= 40 ? 4.2 : 3.6;
+  let fsS = nomeS.length <= 22 ? 5 : nomeS.length <= 40 ? 4.3 : 3.7;
+  let fsEn = d.en.length <= 24 ? 4.8 : d.en.length <= 40 ? 4.2 : 3.6;
+  fs *= x('tit'); fsS *= x('sub'); fsEn *= x('en');
+  const lato = Math.min(55, 38 * (G.foto || 1)).toFixed(1);
   const foto = d.foto ? `<img src="${d.foto}" alt="">` : (ILL[d.img] || ILL.gelato);
   const icone = [];
   if (d.vegan) icone.push(`<div class="ico"><div class="tondo">${ICO.VEGAN}</div><div class="tx">VEGAN</div></div>`);
@@ -330,17 +353,18 @@ function etichettaHtml(d) {
       <div class="tit">
         <div class="it" style="font-size:${fs.toFixed(2)}mm">${esc(nomeP)}</div>
         ${nomeS ? `<div class="it2" style="font-size:${fsS.toFixed(2)}mm">${esc(nomeS)}</div>` : ''}
-        <div class="en" style="font-size:${fsEn}mm">${esc(d.en)}</div>
+        <div class="en" style="font-size:${fsEn.toFixed(2)}mm">${esc(d.en)}</div>
       </div>
-      <div class="img">${foto}</div>
+      <div class="img" style="height:${lato}mm;width:${lato}mm">${foto}</div>
       <div class="basso${d.claim && icone.length > 2 ? ' stretto' : ''}">
         ${d.claim ? `<div class="claim">${esc(d.claim)}</div>` : ''}
-        <div class="icone">${iconeHtml}</div>
+        <div class="icone" style="zoom:${x('al').toFixed(2)}">${iconeHtml}</div>
       </div>
     </div></div>`;
 }
 function render() {
   try { aggiornaBottoneFoto(); } catch (e) {}
+  const ct = document.getElementById('cursoriTutte'); if (ct) ct.innerHTML = cursoriMisure(MISURE, 'misuraTutte(', ['foto', 'tit', 'sub', 'en', 'al']) + '<button type="button" style="padding:4px 8px;font-size:11px;background:#eef2ea;color:#2d6a4f" onclick="MISURE={...MISURE_BASE};misuraTutte(\'foto\',1)">Rimetti normali</button>';
   const coda = RICETTE.filter(r => !datiEtichetta(r).stampata);
   document.getElementById('ncoda').textContent = coda.length;
   document.getElementById('ntutti').textContent = RICETTE.length;
@@ -361,6 +385,8 @@ function render() {
         <label>Immagine</label><select onchange="salvaVoce('${esc(k)}','img',this.value)">${opzImg.replace(`value="${d.img}"`, `value="${d.img}" selected`)}</select>
         <label>Vegan</label><select onchange="salvaVoce('${esc(k)}','vegan',this.value==='si')"><option value="si" ${d.vegan ? 'selected' : ''}>Sì</option><option value="no" ${!d.vegan ? 'selected' : ''}>No</option></select>
         <label>Claim (solo se la Linea Mente lo consente)</label><select onchange="salvaVoce('${esc(k)}','claim',this.value)">${CLAIM_SCELTE.map(c => `<option value="${esc(c)}" ${c === d.claim ? 'selected' : ''}>${c ? esc(c.replace('Fa bene: ', '').slice(0, 70)) + '…' : '— nessuno —'}</option>`).join('')}</select>
+        <details class="misure" ${APERTI.has(k) ? 'open' : ''} ontoggle="this.open ? APERTI.add('${esc(k)}') : APERTI.delete('${esc(k)}')"><summary>📏 Misure di questa etichetta</summary>${cursoriMisure(d.mis || {}, `misuraEtichetta('${esc(k)}',`, ['tit', 'sub', 'en', 'al'])}
+          <button type="button" style="padding:4px 8px;font-size:11px;background:#eef2ea;color:#2d6a4f" onclick="salvaVoce('${esc(k)}','mis',{})">Rimetti normali</button></details>
         <label>Foto dell'ingrediente</label>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <label class="b-verde" style="padding:6px 10px;border-radius:6px;color:#fff;text-transform:none;font-size:12px;cursor:pointer">📷 ${d.foto ? 'Cambia foto' : 'Carica foto'}<input type="file" accept="image/*" style="display:none" onchange="caricaFoto('${esc(k)}',this.files[0])"></label>
@@ -597,7 +623,7 @@ function avvia() {
     if (u && !ok) { document.getElementById('loginErr').textContent = 'Account ' + u.email + ' non autorizzato.'; app.auth().signOut(); }
     if (!ok) return;
     document.getElementById('utente').textContent = u.email; document.getElementById('b-genera').style.display = u.email === 'gelateriagreed@gmail.com' ? '' : 'none'; UTENTE = u;
-    db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; render(); });
+    db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; MISURE = { ...MISURE_BASE, ...((s.exists && s.data().misure) || {}) }; render(); });
     db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; FOTO_STILE = {}; s.forEach(d => { const k = decodeURIComponent(d.id), x = d.data(); FOTO[k] = x.img; if (x.auto) FOTO_STILE[k] = x.stile || 'vecchia'; }); render(); });
     db.collection('ingredienti_composti').onSnapshot(s => { COMPOSTI_LAB = {}; s.forEach(d => COMPOSTI_LAB[d.id] = d.data()); render(); }, () => {});
     db.collection('ricette_lab').onSnapshot(s => {
