@@ -328,8 +328,8 @@ function render() {
       <div class="campi">
         <div>${d.stampata ? `<span class="chip">stampata ${new Date(d.stampata).toLocaleDateString('it-IT')}</span>` : '<span class="chip nuovo">da stampare</span>'}
           <label style="float:right;text-transform:none;font-size:12px"><input type="checkbox" ${SEL.has(k) ? 'checked' : ''} onchange="toggleSel('${esc(k)}',this.checked)" style="width:auto"> stampa</label></div>
-        <label>Nome italiano</label><input value="${esc(d.it)}" onchange="salvaVoce('${esc(k)}','it',this.value)">
-        <label>Nome inglese</label><input value="${esc(d.en)}" onchange="salvaVoce('${esc(k)}','en',this.value)">
+        <label>Nome italiano</label><input value="${esc(d.it)}" onchange="cambiaNomeIt('${esc(k)}',this.value)">
+        <label>Nome inglese</label><input value="${esc(d.en)}" onchange="cambiaNomeEn('${esc(k)}',this.value)" title="Si traduce da solo quando cambi il nome italiano">
         <label>Immagine</label><select onchange="salvaVoce('${esc(k)}','img',this.value)">${opzImg.replace(`value="${d.img}"`, `value="${d.img}" selected`)}</select>
         <label>Vegan</label><select onchange="salvaVoce('${esc(k)}','vegan',this.value==='si')"><option value="si" ${d.vegan ? 'selected' : ''}>Sì</option><option value="no" ${!d.vegan ? 'selected' : ''}>No</option></select>
         <label>Claim (solo se la Linea Mente lo consente)</label><select onchange="salvaVoce('${esc(k)}','claim',this.value)">${CLAIM_SCELTE.map(c => `<option value="${esc(c)}" ${c === d.claim ? 'selected' : ''}>${c ? esc(c.replace('Fa bene: ', '').slice(0, 70)) + '…' : '— nessuno —'}</option>`).join('')}</select>
@@ -346,10 +346,32 @@ function render() {
 function vista(v) { VISTA = v; document.getElementById('t-coda').classList.toggle('on', v === 'coda'); document.getElementById('t-tutti').classList.toggle('on', v === 'tutti'); render(); }
 function toggleSel(k, on) { on ? SEL.add(k) : SEL.delete(k); render(); }
 function selezionaCoda() { RICETTE.filter(r => !datiEtichetta(r).stampata).forEach(r => SEL.add(chiave(r.nome))); render(); }
-async function salvaVoce(k, campo, valore) {
-  VOCI[k] = { ...(VOCI[k] || {}), [campo]: valore }; render();
-  try { await db.collection('config').doc('etichette').set({ voci: { [k]: { [campo]: valore } } }, { merge: true }); }
+async function salvaVoce(k, campo, valore, extra) {
+  const agg = { [campo]: valore, ...(extra || {}) };
+  VOCI[k] = { ...(VOCI[k] || {}), ...agg }; render();
+  try { await db.collection('config').doc('etichette').set({ voci: { [k]: agg } }, { merge: true }); }
   catch (e) { document.getElementById('msg').textContent = '⚠️ Non salvato: ' + e.message; }
+}
+// Nome italiano cambiato → nome inglese tradotto da solo (se l'inglese non è stato scritto a mano)
+async function cambiaNomeIt(k, valore) {
+  valore = String(valore || '').trim();
+  await salvaVoce(k, 'it', valore);
+  if (!valore || (VOCI[k] || {}).en_mano) return;
+  const msg = document.getElementById('msg'); msg.textContent = '🌍 Traduco in inglese: ' + valore + '…';
+  try {
+    const tok = await UTENTE.getIdToken();
+    const r = await fetch(URL_FOTO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ traduci_nome: valore }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.en) throw new Error(j.errore || ('errore ' + r.status));
+    await salvaVoce(k, 'en', j.en, { en_mano: false });
+    msg.textContent = '✓ Inglese: ' + j.en;
+  } catch (e) { msg.textContent = '⚠️ Traduzione non riuscita (' + e.message + '): scrivi l\'inglese a mano.'; }
+}
+// Inglese scritto a mano → non lo tocco più; se lo svuoti torna automatico
+function cambiaNomeEn(k, valore) {
+  valore = String(valore || '').trim();
+  if (!valore) { const it = (VOCI[k] || {}).it; salvaVoce(k, 'en', '', { en_mano: false }); if (it) cambiaNomeIt(k, it); return; }
+  salvaVoce(k, 'en', valore, { en_mano: true });
 }
 // ── Foto: ridotta a 900 px e salvata una volta per sempre (raccolta etichette_foto) ──
 function riduci(file) {
