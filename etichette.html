@@ -78,6 +78,7 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
     <div class="barra">
       <button class="tab on" id="t-coda" onclick="vista('coda')">🆕 Da stampare (<span id="ncoda">0</span>)</button>
       <button class="tab" id="t-tutti" onclick="vista('tutti')">Tutti i gusti (<span id="ntutti">0</span>)</button>
+      <button class="b-verde" id="b-genera" onclick="generaFoto()" style="display:none">✨ Genera foto</button>
       <span class="stato" id="msg">I gusti nuovi del gestionale compaiono qui da soli. Quando sono 8 riempiono un foglio A4.</span>
     </div>
     <div class="griglia" id="griglia"></div>
@@ -311,6 +312,7 @@ function etichettaHtml(d) {
     </div></div>`;
 }
 function render() {
+  try { aggiornaBottoneFoto(); } catch (e) {}
   const coda = RICETTE.filter(r => !datiEtichetta(r).stampata);
   document.getElementById('ncoda').textContent = coda.length;
   document.getElementById('ntutti').textContent = RICETTE.length;
@@ -366,6 +368,143 @@ async function caricaFoto(k, file) {
   catch (e) { document.getElementById('msg').textContent = '⚠️ Foto non salvata: ' + e.message; }
 }
 async function togliFoto(k) { delete FOTO[k]; render(); try { await db.collection('etichette_foto').doc(encodeURIComponent(k)).delete(); } catch (e) {} }
+// ── Foto generate (Google Imagen tramite il server): una per gruppo di gusti, stile sempre uguale ──
+// Semifreddo, Cremolato, Keto e le varianti dello stesso gusto usano la stessa foto.
+const STILE_FOTO_V = 'imagen1', URL_FOTO = 'https://assistente-u3jmxuuypq-ey.a.run.app';
+let FOTO_STILE = {}, UTENTE = null, GENERA_IN_CORSO = false;
+const GRUPPI_FOTO = [
+ [/fico.{0,3}india/i,'ficoindia','prickly pears (Opuntia fruits), whole and one cut open'],
+ [/olio evo al cedro/i,'oliocedro','a small glass cruet of extra virgin olive oil with a citron, fresh basil leaves and cinnamon sticks'],
+ [/pistacchio con olio/i,'pistacchio_olio','shelled Bronte pistachios and a small glass cruet of extra virgin olive oil'],
+ [/pistacchio.*mandorl|mandorl.*pistacchio/i,'pistacchio_mandorla','shelled pistachios and almonds'],
+ [/pistacchi/i,'pistacchio','pistachios in open shells and chopped green pistachio crumbs'],
+ [/mandorl/i,'mandorla','whole almonds, some peeled and some with skin'],
+ [/arachid/i,'arachide','roasted peanuts, some in the shell and some shelled'],
+ [/arancia/i,'arancia','fresh oranges with leaves, one cut in half'],
+ [/autunno/i,'autunno','roasted pumpkin cubes, almonds and cinnamon sticks'],
+ [/barbabietola/i,'barbabietola','fresh red beetroots, one cut in half'],
+ [/bergamotto/i,'bergamotto','fresh yellow bergamot citrus fruits with leaves, one cut in half'],
+ [/burro/i,'burro','a block of fresh butter with a butter curl'],
+ [/cachi/i,'cachi','ripe orange persimmons (kaki), one cut open'],
+ [/cacio e pepe/i,'caciopepe','shaved Pecorino Romano cheese and black peppercorns'],
+ [/tiramis/i,'tiramisu','ladyfinger biscuits, coffee beans, cocoa powder and a small bowl of mascarpone'],
+ [/caff/i,'caffe','roasted coffee beans and a small cup of espresso'],
+ [/cannolo/i,'cannolo','Sicilian cannoli filled with ricotta and chocolate chips'],
+ [/carota/i,'carota','fresh carrots with green tops'],
+ [/castagn/i,'castagna','roasted chestnuts with a chestnut burr'],
+ [/barolo|castelmagno/i,'barolo','a wedge of blue cheese and a glass of red wine'],
+ [/erborinato/i,'erborinato','a wedge of blue-veined cheese'],
+ [/cetriolo/i,'cetriolo','fresh cucumbers, one sliced'],
+ [/cheesecake|formaggio spalmabile/i,'cheesecake','a slice of cheesecake with a biscuit base'],
+ [/cioccolat[ao] bianc/i,'ciocbianco','pieces and shavings of white chocolate'],
+ [/cioccolato al latte/i,'cioclatte','pieces and shavings of milk chocolate'],
+ [/gianduia/i,'gianduia','roasted hazelnuts and pieces of gianduja chocolate'],
+ [/fave di cacao/i,'favecacao','raw cocoa beans and an open cocoa pod'],
+ [/massa|cacao|cioccolato ana/i,'cacao','cocoa powder, pieces of cocoa mass and cocoa beans'],
+ [/cioccolat/i,'cioccolato','pieces and shavings of dark chocolate'],
+ [/cocco/i,'cocco','coconuts, one split in half, and grated coconut'],
+ [/zabaion/i,'zabaione','egg yolks, a glass of Marsala wine and sugar'],
+ [/^crema$/i,'crema','fresh eggs, lemon zest and a vanilla pod'],
+ [/anguria/i,'anguria','slices of red watermelon'],
+ [/cedro/i,'cedro','fresh citrons (cedro), one cut in half'],
+ [/fico|fichi/i,'fico','fresh figs, one cut in half'],
+ [/limone/i,'limone','fresh lemons with leaves, one cut in half'],
+ [/visciol|amarena/i,'visciola','fresh sour cherries (amarena) with stems'],
+ [/fave e pecorino/i,'favepecorino','fresh shelled broad beans, pods and Pecorino Romano cheese'],
+ [/finocchio/i,'finocchio','fresh fennel bulbs with green fronds'],
+ [/fior di latte|panna/i,'fiordilatte','a glass bottle of fresh milk and a small bowl of cream'],
+ [/fior di mare/i,'fiordimare','zucchini flowers, anchovies and sheep ricotta'],
+ [/uva fragola/i,'uvafragola','bunches of dark Fragola grapes'],
+ [/fragol/i,'fragola','fresh strawberries, one cut in half'],
+ [/frascati|moscato/i,'frascati','bunches of white grapes and a glass of white wine'],
+ [/gelso|mora\b|more\b/i,'mora','black mulberries and blackberries'],
+ [/insalata/i,'insalata','fresh lettuce and a drizzle of extra virgin olive oil'],
+ [/lampon/i,'lampone','fresh raspberries'],
+ [/liquirizia e cannella/i,'liquiriziacannella','liquorice roots and cinnamon sticks'],
+ [/liquirizia/i,'liquirizia','liquorice roots and liquorice sticks'],
+ [/mandarin/i,'mandarino','mandarins with leaves, one peeled into segments'],
+ [/melagran|melogran/i,'melagrana','pomegranates, one open showing red seeds'],
+ [/mela\b|mele\b/i,'mela','red apples, one sliced, and cinnamon sticks'],
+ [/melone/i,'melone','slices of cantaloupe melon with orange flesh'],
+ [/miele|origami/i,'miele','a jar of honey with a honey dipper and small flowers'],
+ [/mirtill/i,'mirtillo','fresh blueberries'],
+ [/nocciol/i,'nocciola','roasted hazelnuts, whole and in the shell'],
+ [/olio evo/i,'olio','a small glass cruet of extra virgin olive oil and green olives'],
+ [/padano|pecorino/i,'pecorino','shaved aged cheese and a wedge of cheese'],
+ [/panzanella/i,'panzanella','cubes of rustic bread, cherry tomatoes, red onion and basil'],
+ [/\bpera\b|\bpere\b/i,'pera','ripe pears, one cut in half'],
+ [/pesca|pesche/i,'pesca','ripe peaches, one cut in half'],
+ [/rosa antico/i,'rosaantico','fresh ricotta, strawberries and a glass of Marsala wine'],
+ [/petali|rosa\b/i,'rosa','rose petals and rose buds'],
+ [/pizzoccheri/i,'pizzoccheri','buckwheat pizzoccheri pasta and caramelized potatoes'],
+ [/pollo/i,'pollo','red and yellow bell peppers and tomatoes'],
+ [/porchetta/i,'porchetta','slices of porchetta with golden crackling and rosemary'],
+ [/puntarelle/i,'puntarelle','fresh puntarelle chicory and anchovy fillets'],
+ [/ricotta|sapore mediterraneo/i,'ricotta','fresh ricotta in a small wicker basket'],
+ [/rosso vichingo/i,'rossovichingo','tomatoes, red bell peppers and peppercorns'],
+ [/sedano/i,'sedano','fresh celery stalks with leaves'],
+ [/stracchino/i,'stracchino','fresh creamy stracchino cheese'],
+ [/albicocc/i,'albicocca','fresh apricots, one cut in half'],
+ [/vaniglia/i,'vaniglia','vanilla pods and vanilla flowers'],
+ [/zucca/i,'zucca','a small pumpkin and roasted pumpkin cubes'],
+ [/banana/i,'banana','ripe bananas, one peeled'],
+ [/menta/i,'menta','fresh mint leaves'],
+ [/yogurt/i,'yogurt','a small bowl of white yogurt'],
+ [/mango/i,'mango','ripe mangoes, one cut open'],
+ [/cannella/i,'cannella','cinnamon sticks and ground cinnamon'],
+];
+function gruppoFoto(nome) {
+  const n = String(nome || '');
+  for (const [rx, k, s] of GRUPPI_FOTO) if (rx.test(n)) return { k, s };
+  // gusto nuovo che non conosco: foto degli ingredienti dal nome inglese
+  const en = nomeInglese(n).replace(/\b(semifreddo|cremolato|keto|frozen)\b/gi, '').replace(/[+%0-9()]/g, '').trim();
+  return { k: 'auto_' + en.toLowerCase().replace(/[^a-z]+/g, '_'), s: 'the natural ingredients of ' + en + ' gelato, fresh and whole' };
+}
+// Gusti che vanno ancora fatti: senza foto, oppure con una foto automatica vecchia (le foto caricate a mano non si toccano)
+function gustiDaFotografare() { return RICETTE.filter(r => { const k = chiave(r.nome); return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
+function aggiornaBottoneFoto() {
+  const b = document.getElementById('b-genera'); if (!b || GENERA_IN_CORSO) return;
+  const g = new Set(gustiDaFotografare().map(r => gruppoFoto(r.nome).k)).size;
+  b.textContent = g ? `✨ Genera ${g} foto (circa ${(g * 0.04).toFixed(2).replace('.', ',')} $)` : '✓ Foto complete';
+  b.disabled = !g;
+}
+function aJpeg(src, lato = 700) {
+  return new Promise((ok, ko) => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = lato;
+    const x = c.getContext('2d'); x.fillStyle = '#fbf5e8'; x.fillRect(0, 0, lato, lato); x.drawImage(im, 0, 0, lato, lato); ok(c.toDataURL('image/jpeg', 0.86)); };
+    im.onerror = () => ko(new Error('immagine non leggibile')); im.src = src; });
+}
+async function generaFoto() {
+  if (GENERA_IN_CORSO || !UTENTE) return;
+  const msg = document.getElementById('msg'), b = document.getElementById('b-genera');
+  const gruppi = {}; gustiDaFotografare().forEach(r => { const g = gruppoFoto(r.nome); (gruppi[g.k] = gruppi[g.k] || { s: g.s, gusti: [] }).gusti.push(chiave(r.nome)); });
+  const chiavi = Object.keys(gruppi); if (!chiavi.length) return;
+  GENERA_IN_CORSO = true; b.disabled = true;
+  let fatte = 0, errori = 0, ultimoErrore = '';
+  for (const g of chiavi) {
+    b.textContent = `⏳ Foto ${fatte + errori + 1} di ${chiavi.length}…`; msg.textContent = 'Sto facendo: ' + gruppi[g].gusti.map(nomeItaliano).join(', ');
+    try {
+      let img = null;
+      const cache = await db.collection('etichette_foto_gruppi').doc(g).get();
+      if (cache.exists && cache.data().stile === STILE_FOTO_V) img = cache.data().img;
+      if (!img) {
+        const tok = await UTENTE.getIdToken();
+        const r = await fetch(URL_FOTO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ soggetto_foto: gruppi[g].s }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.img) throw new Error(j.errore || ('errore ' + r.status));
+        img = await aJpeg(j.img);
+        await db.collection('etichette_foto_gruppi').doc(g).set({ img, stile: STILE_FOTO_V, soggetto: gruppi[g].s, ts: Date.now() });
+      }
+      for (const k of gruppi[g].gusti) { FOTO[k] = img; FOTO_STILE[k] = STILE_FOTO_V;
+        await db.collection('etichette_foto').doc(encodeURIComponent(k)).set({ img, ts: Date.now(), auto: true, stile: STILE_FOTO_V, gruppo: g }); }
+      fatte++; errori = 0; render();
+    } catch (e) {
+      errori++; ultimoErrore = e.message; console.error('[foto]', g, e);
+      if (errori >= 3) break;
+    }
+  }
+  GENERA_IN_CORSO = false; render();
+  msg.textContent = ultimoErrore && errori ? `⚠️ Fatte ${fatte} foto, poi errore: ${ultimoErrore}. Premi di nuovo per riprovare.` : `✓ Fatte ${fatte} foto.`;
+}
 // Testo sempre uguale per avere foto coerenti tra loro
 function copiaPrompt(k) {
   const r = RICETTE.find(x => chiave(x.nome) === k); if (!r) return;
@@ -405,9 +544,9 @@ function avvia() {
     document.getElementById('app').style.display = ok ? 'block' : 'none';
     if (u && !ok) { document.getElementById('loginErr').textContent = 'Account ' + u.email + ' non autorizzato.'; app.auth().signOut(); }
     if (!ok) return;
-    document.getElementById('utente').textContent = u.email;
+    document.getElementById('utente').textContent = u.email; document.getElementById('b-genera').style.display = u.email === 'gelateriagreed@gmail.com' ? '' : 'none'; UTENTE = u;
     db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; render(); });
-    db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; s.forEach(d => { FOTO[decodeURIComponent(d.id)] = d.data().img; }); render(); });
+    db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; FOTO_STILE = {}; s.forEach(d => { const k = decodeURIComponent(d.id), x = d.data(); FOTO[k] = x.img; if (x.auto) FOTO_STILE[k] = x.stile || 'vecchia'; }); render(); });
     db.collection('ingredienti_composti').onSnapshot(s => { COMPOSTI_LAB = {}; s.forEach(d => COMPOSTI_LAB[d.id] = d.data()); render(); }, () => {});
     db.collection('ricette_lab').onSnapshot(s => {
       const tutte = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && !r.eliminata);
