@@ -38,10 +38,13 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
 .eti .sotto-logo{position:absolute;top:13.4mm;left:0;right:0;text-align:center;font-family:'Montserrat',sans-serif;font-weight:600;font-size:1.9mm;letter-spacing:.22em;padding-left:.22em;color:#1d2a1a}
 .eti .orn{position:absolute;top:15.8mm;left:0;right:0;text-align:center;color:#d4572e;font-size:2.4mm;line-height:1}
 .eti .corpo{position:absolute;top:18.6mm;bottom:7.6mm;left:8.5mm;right:8.5mm;display:flex;flex-direction:column;align-items:center}
+.eti .tit{flex:none;height:18mm;width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.eti .it2{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:600;line-height:1.02;color:#16241a;margin-top:.3mm}
+.eti .basso{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .eti .it{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:62.5%;font-variation-settings:'wdth' 62.5;font-weight:700;line-height:.98;color:#16241a}
 .eti .en{margin-top:.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:500;line-height:1.05;color:#16241a}
-.eti .img{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;margin:1.2mm 0}
-.eti .img img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
+.eti .img{flex:none;height:38mm;width:100%;display:flex;align-items:center;justify-content:center;margin:1mm 0}
+.eti .img img{width:38mm;height:38mm;object-fit:contain;mix-blend-mode:multiply;-webkit-mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%);mask-image:radial-gradient(ellipse 72% 72% at 50% 50%,#000 58%,transparent 100%)}
 .eti .img svg{height:100%;max-width:100%}
 .eti .icone{display:flex;flex-wrap:wrap;flex-shrink:0;justify-content:center;align-items:center;gap:1.8mm 3mm}
 .eti .ico{display:flex;align-items:center;gap:1.4mm}
@@ -287,12 +290,32 @@ const ICO = {
 };
 const EN_ALL = { LATTE:'MILK', 'FRUTTA A GUSCIO':'TREE NUTS', UOVA:'EGGS', SOIA:'SOY', ARACHIDI:'PEANUTS', SESAMO:'SESAME', SOLFITI:'SULPHITES',
   GLUTINE:'GLUTEN', PESCE:'FISH', CROSTACEI:'CRUSTACEANS', MOLLUSCHI:'MOLLUSCS', SEDANO:'CELERY', SENAPE:'MUSTARD', LUPINI:'LUPIN' };
+// Divide il nome: parte principale + resto più piccolo. Con "|" decidi tu dove dividere (es. "Burro | e visciole").
+function dividiNome(it) {
+  it = String(it || '').trim();
+  if (it.includes('|')) { const [a, ...b] = it.split('|'); return [a.trim(), b.join(' ').trim()]; }
+  if (it.length <= 16) return [it, ''];
+  const m = it.match(/^(.+?)\s+((?:e|ed|con|al|allo|alla|ai|agli|alle|di|del|della|dei|delle|in|\+|&)\s.+)$/i);
+  return m ? [m[1], m[2]] : [it, ''];
+}
+// Dopo il disegno: se il titolo non sta nel suo spazio fisso, rimpicciolisce le scritte (la foto resta sempre uguale)
+function adattaTitoli(root) {
+  (root || document).querySelectorAll('.eti .tit').forEach(t => {
+    for (let i = 0; i < 25 && t.scrollHeight > t.clientHeight + 1; i++)
+      t.querySelectorAll('.it,.it2,.en').forEach(x => { x.style.fontSize = (parseFloat(x.style.fontSize) * 0.94).toFixed(2) + 'mm'; });
+  });
+  (root || document).querySelectorAll('.eti .basso').forEach(t => {
+    for (let i = 0; i < 12 && t.scrollHeight > t.clientHeight + 1; i++) t.style.zoom = ((parseFloat(t.style.zoom) || 1) * 0.94).toFixed(3);
+  });
+}
 function etichettaHtml(d) {
-  // dimensione del nome: la parola più lunga deve stare nella riga (55 mm), e al massimo 3 righe
-  const parole = d.it.split(/\s+/), lunga = Math.max(...parole.map(p => p.length));
+  // nome su due livelli: "Burro e confettura di visciole" → "Burro" grande, "e confettura di visciole" più piccolo
+  const [nomeP, nomeS] = dividiNome(d.it);
+  const parole = nomeP.split(/\s+/), lunga = Math.max(...parole.map(p => p.length));
   let fs = Math.min(11, 55 / (0.37 * lunga));
   const stimaRighe = f => { let r = 1, l = 0; parole.forEach(p => { const w = p.length * 0.37 * f + (l ? 0.25 * f : 0); if (l + w > 55) { r++; l = p.length * 0.37 * f; } else l += w; }); return r; };
   while (stimaRighe(fs) > 2 && fs > 5.2) fs -= 0.3;
+  const fsS = nomeS.length <= 22 ? 5 : nomeS.length <= 40 ? 4.3 : 3.7;
   const fsEn = d.en.length <= 24 ? 4.8 : d.en.length <= 40 ? 4.2 : 3.6;
   const foto = d.foto ? `<img src="${d.foto}" alt="">` : (ILL[d.img] || ILL.gelato);
   const icone = [];
@@ -304,11 +327,16 @@ function etichettaHtml(d) {
     <div class="logo">${typeof LOGO_GREED !== 'undefined' && LOGO_GREED ? `<img src="${LOGO_GREED}" alt="GREED">` : 'GREED'}</div>
     <div class="sotto-logo">GELATO NATURALE</div><div class="orn">❦</div>
     <div class="corpo">
-      <div class="it" style="font-size:${fs.toFixed(2)}mm">${esc(d.it)}</div>
-      <div class="en" style="font-size:${fsEn}mm">${esc(d.en)}</div>
+      <div class="tit">
+        <div class="it" style="font-size:${fs.toFixed(2)}mm">${esc(nomeP)}</div>
+        ${nomeS ? `<div class="it2" style="font-size:${fsS.toFixed(2)}mm">${esc(nomeS)}</div>` : ''}
+        <div class="en" style="font-size:${fsEn}mm">${esc(d.en)}</div>
+      </div>
       <div class="img">${foto}</div>
-      ${d.claim ? `<div class="claim">${esc(d.claim)}</div>` : ''}
-      <div class="icone">${iconeHtml}</div>
+      <div class="basso${d.claim && icone.length > 2 ? ' stretto' : ''}">
+        ${d.claim ? `<div class="claim">${esc(d.claim)}</div>` : ''}
+        <div class="icone">${iconeHtml}</div>
+      </div>
     </div></div>`;
 }
 function render() {
@@ -342,6 +370,8 @@ function render() {
         <div class="stato">Allergeni presi dalla ricetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
       </div></div>`;
   }).join('');
+  adattaTitoli(g);
+  if (document.fonts) document.fonts.ready.then(() => adattaTitoli(g));
 }
 function vista(v) { VISTA = v; document.getElementById('t-coda').classList.toggle('on', v === 'coda'); document.getElementById('t-tutti').classList.toggle('on', v === 'tutti'); render(); }
 function toggleSel(k, on) { on ? SEL.add(k) : SEL.delete(k); render(); }
@@ -547,7 +577,7 @@ async function stampa() {
   const fogli = [];
   for (let i = 0; i < scelte.length; i += 8) fogli.push('<div class="foglio">' + scelte.slice(i, i + 8).map(r => etichettaHtml(datiEtichetta(r))).join('') + '</div>');
   document.getElementById('fogli').innerHTML = fogli.join('');
-  await document.fonts.ready; window.print();
+  await document.fonts.ready; const fg = document.getElementById('fogli'); fg.style.cssText = 'display:block;position:absolute;left:-9999px;top:0'; adattaTitoli(fg); fg.style.cssText = ''; window.print();
   if (confirm(`Stampate ${scelte.length} etichette su ${fogli.length} fogli A4.\nLe segno come stampate, così escono dalla lista "Da stampare"?`)) {
     const ora = Date.now(), agg = {};
     scelte.forEach(r => { const k = chiave(r.nome); VOCI[k] = { ...(VOCI[k] || {}), stampata: ora }; agg[k] = { stampata: ora }; });
