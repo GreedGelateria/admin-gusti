@@ -266,7 +266,7 @@ function datiEtichetta(r) {
   const testoIng = (r.ingredienti || []).map(i => String(i.nome || '').toLowerCase()).join(' ');
   const vegan = v.vegan !== undefined ? v.vegan : (!al.includes('LATTE') && !al.includes('UOVA') && !/miele|gelatina|carminio|cocciniglia/.test(testoIng));
   return { it: v.it || nomeItaliano(r.nome), en: v.en || nomeInglese(r.nome), img: v.img || illustrazionePer(r.nome),
-           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null, mis: v.mis || {}, sub: v.sub || '', subEn: v.sub_en || '' };
+           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || (r._copiaDi ? FOTO[r._copiaDi] : null) || null, mis: v.mis || {}, sub: v.sub || '', subEn: v.sub_en || '' };
 }
 
 // ── Sagoma vintage (mm): cupola in alto, angoli intagliati, doppia cornice ──
@@ -403,7 +403,8 @@ function render() {
           ${d.foto ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliFoto('${esc(k)}')">Togli</button>` : ''}
         </div>
         <div class="stato">Allergeni presi dalla ricetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
-        ${(VOCI[k] || {}).nascosta
+        <button type="button" style="padding:6px 10px;font-size:12px;background:#f3ecdc;color:#6a5a40" onclick="duplicaEtichetta('${esc(k)}')" title="Crea un'altra etichetta con gli stessi ingredienti e allergeni">📄 Duplica</button>
+        ${r._copiaDi ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="eliminaCopia('${esc(k)}')">🗑️ Elimina questa copia</button>` : (VOCI[k] || {}).nascosta
           ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#eef2ea;color:#2d6a4f" onclick="togliEtichetta('${esc(k)}',false)">↩️ Rimetti nelle etichette</button>`
           : `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliEtichetta('${esc(k)}',true)" title="Il gusto resta nel gestionale: lo ritrovi in 'Tolte'">🗑️ Togli dalle etichette</button>`}
       </div></div>`;
@@ -412,6 +413,33 @@ function render() {
   if (document.fonts) document.fonts.ready.then(() => adattaTitoli(g));
 }
 function vista(v) { VISTA = v; ['coda', 'tutti', 'nascoste'].forEach(x => document.getElementById(x === 'nascoste' ? 't-nasc' : 't-' + x).classList.toggle('on', v === x)); render(); }
+// ── Copie di un'etichetta (es. Nocciola della Tuscia e Nocciola IGP Piemonte dalla stessa ricetta) ──
+// Una copia è una voce in config/etichette con "copiaDi": prende ingredienti, allergeni e foto della ricetta originale,
+// ma ha nome, inglese, sottotitolo e misure suoi.
+let RICETTE_LAB = [];
+function ricostruisciRicette() {
+  const per = {}; RICETTE_LAB.forEach(r => per[chiave(r.nome)] = r);
+  const copie = Object.entries(VOCI).filter(([k, v]) => v && v.copiaDi && per[v.copiaDi])
+    .map(([k, v]) => ({ ...per[v.copiaDi], id: k, nome: k, _copiaDi: v.copiaDi }));
+  RICETTE = [...RICETTE_LAB, ...copie].sort((a, b) => {
+    const na = nomeItaliano(a._copiaDi || a.nome), nb = nomeItaliano(b._copiaDi || b.nome);
+    return na.localeCompare(nb, 'it') || (a._copiaDi ? 1 : 0) - (b._copiaDi ? 1 : 0) || a.nome.localeCompare(b.nome);
+  });
+}
+async function duplicaEtichetta(k) {
+  const base = (VOCI[k] || {}).copiaDi || k, r = RICETTE.find(x => chiave(x.nome) === k); if (!r) return;
+  let n = 2; while (VOCI[`${base} · COPIA ${n}`]) n++;
+  const nuova = `${base} · COPIA ${n}`, d = datiEtichetta(r);
+  await salvaVoce(nuova, 'copiaDi', base, { it: d.it, en: d.en, en_mano: !!(VOCI[k] || {}).en_mano, sub: d.sub, sub_en: d.subEn, mis: d.mis || {} });
+  ricostruisciRicette(); VISTA = 'tutti'; vista('tutti');
+  document.getElementById('msg').textContent = '📄 Copia creata di ' + d.it + ': cambia il nome italiano (es. "Nocciola IGP Piemonte"), l\'inglese si traduce da solo.';
+  setTimeout(() => { const el = [...document.querySelectorAll('.scheda')].find(s => s.querySelector(`[onchange^="cambiaNomeIt('${nuova.replace(/'/g, "\\'")}'"]`)); if (el) { el.scrollIntoView({ block: 'center' }); el.style.outline = '3px solid #c9a24a'; } }, 50);
+}
+async function eliminaCopia(k) {
+  delete VOCI[k]; SEL.delete(k); ricostruisciRicette(); render();
+  try { await db.collection('config').doc('etichette').set({ voci: { [k]: firebase.firestore.FieldValue.delete() } }, { merge: true }); }
+  catch (e) { document.getElementById('msg').textContent = '⚠️ Non eliminata: ' + e.message; }
+}
 // Gusti tolti dalle etichette (doppioni o non da banco): restano nel gestionale, qui si possono rimettere
 const visibili = () => RICETTE.filter(r => !(VOCI[chiave(r.nome)] || {}).nascosta);
 function togliEtichetta(k, togli) { SEL.delete(k); salvaVoce(k, 'nascosta', !!togli); }
@@ -578,7 +606,8 @@ function gruppoFoto(nome) {
   return { k: 'auto_' + en.toLowerCase().replace(/[^a-z]+/g, '_'), s: 'the natural ingredients of ' + en + ' gelato, fresh and whole' };
 }
 // Gusti che vanno ancora fatti: senza foto, oppure con una foto automatica vecchia (le foto caricate a mano non si toccano)
-function gustiDaFotografare() { return visibili().filter(r => { const k = chiave(r.nome); return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
+function gustiDaFotografare() { return visibili().filter(r => { const k = chiave(r.nome); if (r._copiaDi) return false;   // le copie usano la foto dell'originale
+  return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
 function aggiornaBottoneFoto() {
   const b = document.getElementById('b-genera'); if (!b || GENERA_IN_CORSO) return;
   const da = gustiDaFotografare(), tutti = new Set(da.map(r => gruppoFoto(r.nome).k));
@@ -700,16 +729,15 @@ function avvia() {
     if (u && !ok) { document.getElementById('loginErr').textContent = 'Account ' + u.email + ' non autorizzato.'; app.auth().signOut(); }
     if (!ok) return;
     document.getElementById('utente').textContent = u.email; document.getElementById('b-genera').style.display = u.email === 'gelateriagreed@gmail.com' ? '' : 'none'; UTENTE = u;
-    db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; LOGO_GREED = (s.exists && s.data().logo) || null; MISURE = { ...MISURE_BASE, ...((s.exists && s.data().misure) || {}) }; render(); });
+    db.collection('config').doc('etichette').onSnapshot(s => { VOCI = (s.exists && s.data().voci) || {}; ricostruisciRicette(); LOGO_GREED = (s.exists && s.data().logo) || null; MISURE = { ...MISURE_BASE, ...((s.exists && s.data().misure) || {}) }; render(); });
     db.collection('etichette_foto').onSnapshot(s => { FOTO = {}; FOTO_STILE = {}; s.forEach(d => { const k = decodeURIComponent(d.id), x = d.data(); FOTO[k] = x.img; if (x.auto) FOTO_STILE[k] = x.stile || 'vecchia'; }); render(); });
     db.collection('ingredienti_composti').onSnapshot(s => { COMPOSTI_LAB = {}; s.forEach(d => COMPOSTI_LAB[d.id] = d.data()); render(); }, () => {});
     db.collection('ricette_lab').onSnapshot(s => {
       const tutte = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && !r.eliminata);
       BASI_LAB = {}; tutte.filter(_eBaseLab).forEach(r => BASI_LAB[_normLab(r.nome)] = r);
-      RICETTE = tutte.filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome)
-        && r.tipo !== 'semifreddo' && !/semifredd/i.test(r.nome))   // i semifreddi non vanno al banco: niente etichetta
-        .sort((a, b) => nomeItaliano(a.nome).localeCompare(nomeItaliano(b.nome), 'it'));
-      render();
+      RICETTE_LAB = tutte.filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome)
+        && r.tipo !== 'semifreddo' && !/semifredd/i.test(r.nome));   // i semifreddi non vanno al banco: niente etichetta
+      ricostruisciRicette(); render();
     }, e => { document.getElementById('msg').textContent = '⚠️ ' + e.message; });
   });
   window.accedi = () => { const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' }); app.auth().signInWithPopup(p).catch(e => { document.getElementById('loginErr').textContent = e.message; }); };
