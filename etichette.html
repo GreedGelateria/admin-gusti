@@ -40,6 +40,7 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
 .eti .corpo{position:absolute;top:18.6mm;bottom:7.6mm;left:8.5mm;right:8.5mm;display:flex;flex-direction:column;align-items:center}
 .eti .tit{flex:none;min-height:18mm;max-height:34mm;width:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .eti .it2{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:600;line-height:1.02;color:#16241a;margin-top:.3mm}
+.eti .en2{margin-top:.2mm;font-style:italic}
 .eti .basso{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .eti .it{text-align:center;font-family:'Noto Serif Display',serif;font-stretch:62.5%;font-variation-settings:'wdth' 62.5;font-weight:700;line-height:.98;color:#16241a}
 .eti .en{margin-top:.6mm;text-align:center;font-family:'Noto Serif Display',serif;font-stretch:70%;font-variation-settings:'wdth' 70;font-weight:500;line-height:1.05;color:#16241a}
@@ -264,7 +265,7 @@ function datiEtichetta(r) {
   const testoIng = (r.ingredienti || []).map(i => String(i.nome || '').toLowerCase()).join(' ');
   const vegan = v.vegan !== undefined ? v.vegan : (!al.includes('LATTE') && !al.includes('UOVA') && !/miele|gelatina|carminio|cocciniglia/.test(testoIng));
   return { it: v.it || nomeItaliano(r.nome), en: v.en || nomeInglese(r.nome), img: v.img || illustrazionePer(r.nome),
-           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null, mis: v.mis || {} };
+           al, vegan, claim: v.claim || '', stampata: v.stampata || null, foto: FOTO[chiave(r.nome)] || null, mis: v.mis || {}, sub: v.sub || '', subEn: v.sub_en || '' };
 }
 
 // ── Sagoma vintage (mm): cupola in alto, angoli intagliati, doppia cornice ──
@@ -330,7 +331,7 @@ function adattaTitoli(root) {
 }
 function etichettaHtml(d) {
   // nome su due livelli: "Burro e confettura di visciole" → "Burro" grande, "e confettura di visciole" più piccolo
-  const [nomeP, nomeS] = dividiNome(d.it);
+  const [nomeP, nomeS] = d.sub ? [d.it, d.sub] : dividiNome(d.it);
   const parole = nomeP.split(/\s+/), lunga = Math.max(...parole.map(p => p.length));
   const G = MISURE, m = d.mis || {}, x = c => (G[c] || 1) * (m[c] || 1);
   let fs = Math.min(11, 55 / (0.37 * lunga));
@@ -354,6 +355,7 @@ function etichettaHtml(d) {
         <div class="it" style="font-size:${fs.toFixed(2)}mm">${esc(nomeP)}</div>
         ${nomeS ? `<div class="it2" style="font-size:${fsS.toFixed(2)}mm">${esc(nomeS)}</div>` : ''}
         <div class="en" style="font-size:${fsEn.toFixed(2)}mm">${esc(d.en)}</div>
+        ${d.sub && d.subEn ? `<div class="en en2" style="font-size:${(fsEn * 0.82).toFixed(2)}mm">${esc(d.subEn)}</div>` : ''}
       </div>
       <div class="img" style="height:${lato}mm;width:${lato}mm">${foto}</div>
       <div class="basso${d.claim && icone.length > 2 ? ' stretto' : ''}">
@@ -382,6 +384,8 @@ function render() {
           <label style="float:right;text-transform:none;font-size:12px"><input type="checkbox" ${SEL.has(k) ? 'checked' : ''} onchange="toggleSel('${esc(k)}',this.checked)" style="width:auto"> stampa</label></div>
         <label>Nome italiano</label><input value="${esc(d.it)}" onchange="cambiaNomeIt('${esc(k)}',this.value)">
         <label>Nome inglese</label><input value="${esc(d.en)}" onchange="cambiaNomeEn('${esc(k)}',this.value)" title="Si traduce da solo quando cambi il nome italiano">
+        <label>Sottotitolo (es. ingredienti)</label><input value="${esc(d.sub)}" placeholder="es. zucca, mandorla e cannella" onchange="cambiaSub('${esc(k)}',this.value)">
+        <label>Sottotitolo inglese</label><input value="${esc(d.subEn)}" placeholder="si traduce da solo" onchange="cambiaSubEn('${esc(k)}',this.value)">
         <label>Immagine</label><select onchange="salvaVoce('${esc(k)}','img',this.value)">${opzImg.replace(`value="${d.img}"`, `value="${d.img}" selected`)}</select>
         <label>Vegan</label><select onchange="salvaVoce('${esc(k)}','vegan',this.value==='si')"><option value="si" ${d.vegan ? 'selected' : ''}>Sì</option><option value="no" ${!d.vegan ? 'selected' : ''}>No</option></select>
         <label>Claim (solo se la Linea Mente lo consente)</label><select onchange="salvaVoce('${esc(k)}','claim',this.value)">${CLAIM_SCELTE.map(c => `<option value="${esc(c)}" ${c === d.claim ? 'selected' : ''}>${c ? esc(c.replace('Fa bene: ', '').slice(0, 70)) + '…' : '— nessuno —'}</option>`).join('')}</select>
@@ -407,6 +411,30 @@ async function salvaVoce(k, campo, valore, extra) {
   VOCI[k] = { ...(VOCI[k] || {}), ...agg }; render();
   try { await db.collection('config').doc('etichette').set({ voci: { [k]: agg } }, { merge: true }); }
   catch (e) { document.getElementById('msg').textContent = '⚠️ Non salvato: ' + e.message; }
+}
+// Traduce un testo italiano e lo salva nel campo inglese indicato
+async function traduciIn(k, testo, campo, flag) {
+  const msg = document.getElementById('msg'); msg.textContent = '🌍 Traduco in inglese: ' + testo + '…';
+  try {
+    const tok = await UTENTE.getIdToken();
+    const r = await fetch(URL_FOTO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ traduci_nome: testo }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.en) throw new Error(j.errore || ('errore ' + r.status));
+    await salvaVoce(k, campo, j.en, { [flag]: false });
+    msg.textContent = '✓ Inglese: ' + j.en;
+  } catch (e) { msg.textContent = '⚠️ Traduzione non riuscita (' + e.message + '): scrivi l\'inglese a mano.'; }
+}
+// Sottotitolo (ingredienti): si traduce da solo come il nome
+async function cambiaSub(k, valore) {
+  valore = String(valore || '').trim();
+  await salvaVoce(k, 'sub', valore);
+  if (!valore) { await salvaVoce(k, 'sub_en', '', { sub_en_mano: false }); return; }
+  if (!(VOCI[k] || {}).sub_en_mano) await traduciIn(k, valore, 'sub_en', 'sub_en_mano');
+}
+function cambiaSubEn(k, valore) {
+  valore = String(valore || '').trim();
+  if (!valore) { salvaVoce(k, 'sub_en', '', { sub_en_mano: false }); const s = (VOCI[k] || {}).sub; if (s) traduciIn(k, s, 'sub_en', 'sub_en_mano'); return; }
+  salvaVoce(k, 'sub_en', valore, { sub_en_mano: true });
 }
 // Nome italiano cambiato → nome inglese tradotto da solo (se l'inglese non è stato scritto a mano)
 async function cambiaNomeIt(k, valore) {
