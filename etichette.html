@@ -584,21 +584,31 @@ function aJpeg(src, lato = 700) {
     im.onerror = () => ko(new Error('immagine non leggibile')); im.src = src; });
 }
 // Ritaglio automatico: toglie lo sfondo beige in più attorno al soggetto, così il frutto riempie il riquadro.
-// Riconosce lo sfondo dal colore degli angoli; lascia un margine del 9% e tiene il soggetto al centro.
-function ritaglia(src, lato = 700, margine = 0.09) {
+// Lo sfondo delle foto non è uniforme (luce e ombre): per ogni punto si stima lo sfondo dai bordi della foto
+// (sinistra/destra della riga e alto/basso della colonna) e si considera soggetto solo ciò che se ne stacca.
+function ritaglia(src, lato = 700, margine = 0.08) {
   return new Promise((ok, ko) => { const im = new Image(); im.onload = () => {
     const W = im.naturalWidth, H = im.naturalHeight, s = 160 / Math.max(W, H), w = Math.round(W * s), h = Math.round(H * s);
     const c0 = document.createElement('canvas'); c0.width = w; c0.height = h; const x0 = c0.getContext('2d', { willReadFrequently: true }); x0.drawImage(im, 0, 0, w, h);
-    const px = x0.getImageData(0, 0, w, h).data, at = (i, j) => (j * w + i) * 4;
-    const ang = [[2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3]].map(([i, j]) => [px[at(i, j)], px[at(i, j) + 1], px[at(i, j) + 2]]);
-    const bg = [0, 1, 2].map(k => ang.reduce((t, a) => t + a[k], 0) / 4);
-    let x1 = w, y1 = h, x2 = -1, y2 = -1;
-    for (let j = 0; j < h; j++) { let n = 0; for (let i = 0; i < w; i++) { const p = at(i, j), d = Math.abs(px[p] - bg[0]) + Math.abs(px[p + 1] - bg[1]) + Math.abs(px[p + 2] - bg[2]);
-      if (d > 60) { if (i < x1) x1 = i; if (i > x2) x2 = i; n++; } } if (n > 1) { if (j < y1) y1 = j; if (j > y2) y2 = j; } }
+    const px = x0.getImageData(0, 0, w, h).data, col = (i, j) => { const p = (j * w + i) * 4; return [px[p], px[p + 1], px[p + 2]]; };
+    const media = arr => [0, 1, 2].map(k => arr.reduce((t, a) => t + a[k], 0) / arr.length);
+    const L = [], R = [], T = [], B = [];
+    for (let j = 0; j < h; j++) { L.push(media([col(0, j), col(1, j), col(2, j)])); R.push(media([col(w - 1, j), col(w - 2, j), col(w - 3, j)])); }
+    for (let i = 0; i < w; i++) { T.push(media([col(i, 0), col(i, 1), col(i, 2)])); B.push(media([col(i, h - 1), col(i, h - 2), col(i, h - 3)])); }
+    const sogg = new Uint8Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const fx = i / (w - 1), fy = j / (h - 1), c = col(i, j);
+      const bg = [0, 1, 2].map(k => ((L[j][k] * (1 - fx) + R[j][k] * fx) + (T[i][k] * (1 - fy) + B[i][k] * fy)) / 2);
+      if (Math.abs(c[0] - bg[0]) + Math.abs(c[1] - bg[1]) + Math.abs(c[2] - bg[2]) > 55) sogg[j * w + i] = 1;
+    }
+    let x1 = w, y1 = h, x2 = -1, y2 = -1; const minimo = Math.max(2, Math.round(w * 0.015));
+    for (let j = 0; j < h; j++) { let n = 0; for (let i = 0; i < w; i++) n += sogg[j * w + i]; if (n >= minimo) { if (j < y1) y1 = j; if (j > y2) y2 = j; } }
+    for (let i = 0; i < w; i++) { let n = 0; for (let j = 0; j < h; j++) n += sogg[j * w + i]; if (n >= minimo) { if (i < x1) x1 = i; if (i > x2) x2 = i; } }
+    const bgM = media([...L, ...R, ...T, ...B]);
     const c = document.createElement('canvas'); c.width = c.height = lato; const x = c.getContext('2d');
-    x.fillStyle = `rgb(${bg.map(Math.round).join(',')})`; x.fillRect(0, 0, lato, lato);
+    x.fillStyle = `rgb(${bgM.map(Math.round).join(',')})`; x.fillRect(0, 0, lato, lato);
     if (x2 < 0 || (x2 - x1) * (y2 - y1) < w * h * 0.02) { x.drawImage(im, 0, 0, lato, lato); return ok(c.toDataURL('image/jpeg', 0.86)); }   // soggetto non trovato: lascio com'è
-    const cx = (x1 + x2) / 2 / s, cy = (y1 + y2) / 2 / s, lt = Math.max(x2 - x1, y2 - y1) / s * (1 + 2 * margine);
+    const cx = (x1 + x2 + 1) / 2 / s, cy = (y1 + y2 + 1) / 2 / s, lt = Math.min(Math.max(W, H), Math.max(x2 - x1 + 1, y2 - y1 + 1) / s * (1 + 2 * margine));
     x.drawImage(im, cx - lt / 2, cy - lt / 2, lt, lt, 0, 0, lato, lato);
     ok(c.toDataURL('image/jpeg', 0.86));
   }; im.onerror = () => ko(new Error('immagine non leggibile')); im.src = src; });
