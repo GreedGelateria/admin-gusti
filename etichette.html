@@ -86,6 +86,7 @@ main{padding:18px 22px;max-width:1500px;margin:0 auto}
     <div class="barra">
       <button class="tab on" id="t-coda" onclick="vista('coda')">🆕 Da stampare (<span id="ncoda">0</span>)</button>
       <button class="tab" id="t-tutti" onclick="vista('tutti')">Tutti i gusti (<span id="ntutti">0</span>)</button>
+      <button class="tab" id="t-nasc" onclick="vista('nascoste')" style="display:none">🙈 Tolte (<span id="nnasc">0</span>)</button>
       <button class="b-verde" id="b-genera" onclick="generaFoto()" style="display:none">✨ Genera foto</button>
       <details class="misure" id="misureTutte"><summary>📏 Misure di tutte le etichette</summary><div id="cursoriTutte"></div></details>
       <span class="stato" id="msg">I gusti nuovi del gestionale compaiono qui da soli. Quando sono 8 riempiono un foglio A4.</span>
@@ -367,11 +368,15 @@ function etichettaHtml(d) {
 function render() {
   try { aggiornaBottoneFoto(); } catch (e) {}
   const ct = document.getElementById('cursoriTutte'); if (ct) ct.innerHTML = cursoriMisure(MISURE, 'misuraTutte(', ['foto', 'tit', 'sub', 'en', 'al']) + '<button type="button" style="padding:4px 8px;font-size:11px;background:#eef2ea;color:#2d6a4f" onclick="MISURE={...MISURE_BASE};misuraTutte(\'foto\',1)">Rimetti normali</button>';
-  const coda = RICETTE.filter(r => !datiEtichetta(r).stampata);
+  const vis = visibili(), nasc = RICETTE.filter(r => !vis.includes(r));
+  const coda = vis.filter(r => !datiEtichetta(r).stampata);
   document.getElementById('ncoda').textContent = coda.length;
-  document.getElementById('ntutti').textContent = RICETTE.length;
+  document.getElementById('ntutti').textContent = vis.length;
+  document.getElementById('nnasc').textContent = nasc.length;
+  document.getElementById('t-nasc').style.display = nasc.length ? '' : 'none';
+  if (VISTA === 'nascoste' && !nasc.length) VISTA = 'tutti';
   document.getElementById('nsel').textContent = SEL.size;
-  const lista = VISTA === 'coda' ? coda : RICETTE;
+  const lista = VISTA === 'coda' ? coda : VISTA === 'nascoste' ? nasc : vis;
   const g = document.getElementById('griglia');
   if (!lista.length) { g.innerHTML = `<div class="stato">${VISTA === 'coda' ? 'Nessun gusto nuovo da stampare. 👍' : 'Nessuna ricetta trovata nel gestionale.'}</div>`; return; }
   const opzImg = Object.keys(ILL).map(k => `<option value="${k}">${k.replace('_', ' ')}</option>`).join('');
@@ -398,14 +403,20 @@ function render() {
           ${d.foto ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliFoto('${esc(k)}')">Togli</button>` : ''}
         </div>
         <div class="stato">Allergeni presi dalla ricetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
+        ${(VOCI[k] || {}).nascosta
+          ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#eef2ea;color:#2d6a4f" onclick="togliEtichetta('${esc(k)}',false)">↩️ Rimetti nelle etichette</button>`
+          : `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliEtichetta('${esc(k)}',true)" title="Il gusto resta nel gestionale: lo ritrovi in 'Tolte'">🗑️ Togli dalle etichette</button>`}
       </div></div>`;
   }).join('');
   adattaTitoli(g);
   if (document.fonts) document.fonts.ready.then(() => adattaTitoli(g));
 }
-function vista(v) { VISTA = v; document.getElementById('t-coda').classList.toggle('on', v === 'coda'); document.getElementById('t-tutti').classList.toggle('on', v === 'tutti'); render(); }
+function vista(v) { VISTA = v; ['coda', 'tutti', 'nascoste'].forEach(x => document.getElementById(x === 'nascoste' ? 't-nasc' : 't-' + x).classList.toggle('on', v === x)); render(); }
+// Gusti tolti dalle etichette (doppioni o non da banco): restano nel gestionale, qui si possono rimettere
+const visibili = () => RICETTE.filter(r => !(VOCI[chiave(r.nome)] || {}).nascosta);
+function togliEtichetta(k, togli) { SEL.delete(k); salvaVoce(k, 'nascosta', !!togli); }
 function toggleSel(k, on) { on ? SEL.add(k) : SEL.delete(k); render(); }
-function selezionaCoda() { RICETTE.filter(r => !datiEtichetta(r).stampata).forEach(r => SEL.add(chiave(r.nome))); render(); }
+function selezionaCoda() { visibili().filter(r => !datiEtichetta(r).stampata).forEach(r => SEL.add(chiave(r.nome))); render(); }
 async function salvaVoce(k, campo, valore, extra) {
   const agg = { [campo]: valore, ...(extra || {}) };
   VOCI[k] = { ...(VOCI[k] || {}), ...agg }; render();
@@ -567,7 +578,7 @@ function gruppoFoto(nome) {
   return { k: 'auto_' + en.toLowerCase().replace(/[^a-z]+/g, '_'), s: 'the natural ingredients of ' + en + ' gelato, fresh and whole' };
 }
 // Gusti che vanno ancora fatti: senza foto, oppure con una foto automatica vecchia (le foto caricate a mano non si toccano)
-function gustiDaFotografare() { return RICETTE.filter(r => { const k = chiave(r.nome); return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
+function gustiDaFotografare() { return visibili().filter(r => { const k = chiave(r.nome); return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
 function aggiornaBottoneFoto() {
   const b = document.getElementById('b-genera'); if (!b || GENERA_IN_CORSO) return;
   const da = gustiDaFotografare(), tutti = new Set(da.map(r => gruppoFoto(r.nome).k));
