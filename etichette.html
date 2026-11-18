@@ -476,8 +476,8 @@ async function caricaFoto(k, file) {
 async function togliFoto(k) { delete FOTO[k]; render(); try { await db.collection('etichette_foto').doc(encodeURIComponent(k)).delete(); } catch (e) {} }
 // ── Foto generate (Google Imagen tramite il server): una per gruppo di gusti, stile sempre uguale ──
 // Semifreddo, Cremolato, Keto e le varianti dello stesso gusto usano la stessa foto.
-const STILE_FOTO_V = 'imagen1', URL_FOTO = 'https://assistente-u3jmxuuypq-ey.a.run.app';
-let FOTO_STILE = {}, UTENTE = null, GENERA_IN_CORSO = false;
+const STILE_FOTO_V = 'imagen2', URL_FOTO = 'https://assistente-u3jmxuuypq-ey.a.run.app';
+let FOTO_STILE = {}, UTENTE = null, GENERA_IN_CORSO = false, RITAGLIO_AUTO = false;
 const GRUPPI_FOTO = [
  [/fico.{0,3}india/i,'ficoindia','prickly pears (Opuntia fruits), whole and one cut open'],
  [/olio evo al cedro/i,'oliocedro','a small glass cruet of extra virgin olive oil with a citron, fresh basil leaves and cinnamon sticks'],
@@ -570,14 +570,38 @@ function gruppoFoto(nome) {
 function gustiDaFotografare() { return RICETTE.filter(r => { const k = chiave(r.nome); return !FOTO[k] || (FOTO_STILE[k] && FOTO_STILE[k] !== STILE_FOTO_V); }); }
 function aggiornaBottoneFoto() {
   const b = document.getElementById('b-genera'); if (!b || GENERA_IN_CORSO) return;
-  const g = new Set(gustiDaFotografare().map(r => gruppoFoto(r.nome).k)).size;
-  b.textContent = g ? `✨ Genera ${g} foto (circa ${(g * 0.04).toFixed(2).replace('.', ',')} $)` : '✓ Foto complete';
+  const da = gustiDaFotografare(), tutti = new Set(da.map(r => gruppoFoto(r.nome).k));
+  // foto già generate ma non ancora ritagliate (stile imagen1): basta ritagliarle, gratis
+  const nuove = new Set(da.filter(r => FOTO_STILE[chiave(r.nome)] !== 'imagen1').map(r => gruppoFoto(r.nome).k)), g = tutti.size, n = nuove.size;
+  b.textContent = !g ? '✓ Foto complete' : n ? `✨ Genera ${n} foto (circa ${(n * 0.04).toFixed(2).replace('.', ',')} $)${g > n ? ` e ingrandisci ${g - n}` : ''}` : `✂️ Ingrandisci ${g} foto (gratis)`;
   b.disabled = !g;
+  // la prima volta ingrandisce da sola le foto già fatte (non costa niente)
+  if (g && !n && !RITAGLIO_AUTO && UTENTE && UTENTE.email === 'gelateriagreed@gmail.com' && RICETTE.length) { RITAGLIO_AUTO = true; setTimeout(generaFoto, 1500); }
 }
 function aJpeg(src, lato = 700) {
   return new Promise((ok, ko) => { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = lato;
     const x = c.getContext('2d'); x.fillStyle = '#fbf5e8'; x.fillRect(0, 0, lato, lato); x.drawImage(im, 0, 0, lato, lato); ok(c.toDataURL('image/jpeg', 0.86)); };
     im.onerror = () => ko(new Error('immagine non leggibile')); im.src = src; });
+}
+// Ritaglio automatico: toglie lo sfondo beige in più attorno al soggetto, così il frutto riempie il riquadro.
+// Riconosce lo sfondo dal colore degli angoli; lascia un margine del 9% e tiene il soggetto al centro.
+function ritaglia(src, lato = 700, margine = 0.09) {
+  return new Promise((ok, ko) => { const im = new Image(); im.onload = () => {
+    const W = im.naturalWidth, H = im.naturalHeight, s = 160 / Math.max(W, H), w = Math.round(W * s), h = Math.round(H * s);
+    const c0 = document.createElement('canvas'); c0.width = w; c0.height = h; const x0 = c0.getContext('2d', { willReadFrequently: true }); x0.drawImage(im, 0, 0, w, h);
+    const px = x0.getImageData(0, 0, w, h).data, at = (i, j) => (j * w + i) * 4;
+    const ang = [[2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3]].map(([i, j]) => [px[at(i, j)], px[at(i, j) + 1], px[at(i, j) + 2]]);
+    const bg = [0, 1, 2].map(k => ang.reduce((t, a) => t + a[k], 0) / 4);
+    let x1 = w, y1 = h, x2 = -1, y2 = -1;
+    for (let j = 0; j < h; j++) { let n = 0; for (let i = 0; i < w; i++) { const p = at(i, j), d = Math.abs(px[p] - bg[0]) + Math.abs(px[p + 1] - bg[1]) + Math.abs(px[p + 2] - bg[2]);
+      if (d > 60) { if (i < x1) x1 = i; if (i > x2) x2 = i; n++; } } if (n > 1) { if (j < y1) y1 = j; if (j > y2) y2 = j; } }
+    const c = document.createElement('canvas'); c.width = c.height = lato; const x = c.getContext('2d');
+    x.fillStyle = `rgb(${bg.map(Math.round).join(',')})`; x.fillRect(0, 0, lato, lato);
+    if (x2 < 0 || (x2 - x1) * (y2 - y1) < w * h * 0.02) { x.drawImage(im, 0, 0, lato, lato); return ok(c.toDataURL('image/jpeg', 0.86)); }   // soggetto non trovato: lascio com'è
+    const cx = (x1 + x2) / 2 / s, cy = (y1 + y2) / 2 / s, lt = Math.max(x2 - x1, y2 - y1) / s * (1 + 2 * margine);
+    x.drawImage(im, cx - lt / 2, cy - lt / 2, lt, lt, 0, 0, lato, lato);
+    ok(c.toDataURL('image/jpeg', 0.86));
+  }; im.onerror = () => ko(new Error('immagine non leggibile')); im.src = src; });
 }
 async function generaFoto() {
   if (GENERA_IN_CORSO || !UTENTE) return;
@@ -592,12 +616,16 @@ async function generaFoto() {
       let img = null;
       const cache = await db.collection('etichette_foto_gruppi').doc(g).get();
       if (cache.exists && cache.data().stile === STILE_FOTO_V) img = cache.data().img;
+      else if (cache.exists && cache.data().stile === 'imagen1') {   // foto già pagata: la ritaglio e tengo l'originale
+        img = await ritaglia(cache.data().img);
+        await db.collection('etichette_foto_gruppi').doc(g).set({ img, stile: STILE_FOTO_V, originale: cache.data().img, soggetto: gruppi[g].s, ts: Date.now() });
+      }
       if (!img) {
         const tok = await UTENTE.getIdToken();
         const r = await fetch(URL_FOTO, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ soggetto_foto: gruppi[g].s }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.img) throw new Error(j.errore || ('errore ' + r.status));
-        img = await aJpeg(j.img);
+        img = await ritaglia(j.img);
         await db.collection('etichette_foto_gruppi').doc(g).set({ img, stile: STILE_FOTO_V, soggetto: gruppi[g].s, ts: Date.now() });
       }
       for (const k of gruppi[g].gusti) { FOTO[k] = img; FOTO_STILE[k] = STILE_FOTO_V;
