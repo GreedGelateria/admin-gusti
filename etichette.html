@@ -695,7 +695,8 @@ function avvia() {
     db.collection('ricette_lab').onSnapshot(s => {
       const tutte = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.nome && !r.eliminata);
       BASI_LAB = {}; tutte.filter(_eBaseLab).forEach(r => BASI_LAB[_normLab(r.nome)] = r);
-      RICETTE = tutte.filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome))
+      RICETTE = tutte.filter(r => r.nome && r.tipo !== 'base' && !/^base\b|\bbase\s+(bianca|gialla|latte|frutta)/i.test(r.nome)
+        && r.tipo !== 'semifreddo' && !/semifredd/i.test(r.nome))   // i semifreddi non vanno al banco: niente etichetta
         .sort((a, b) => nomeItaliano(a.nome).localeCompare(nomeItaliano(b.nome), 'it'));
       render();
     }, e => { document.getElementById('msg').textContent = '⚠️ ' + e.message; });
