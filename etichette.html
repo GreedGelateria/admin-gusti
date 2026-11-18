@@ -262,7 +262,8 @@ let RICETTE = [], VOCI = {}, FOTO = {}, SEL = new Set(), VISTA = 'coda', db = nu
 // ── Dati dell'etichetta: automatici dalla ricetta, correggibili a mano ──
 function datiEtichetta(r) {
   const v = VOCI[chiave(r.nome)] || {};
-  const al = allergeniRicetta(r);
+  const ordAl = ALLERGENI_REGOLE.map(a => a.k);
+  const al = [...new Set([...allergeniRicetta(r), ...(v.al_extra || [])])].sort((a, b) => ordAl.indexOf(a) - ordAl.indexOf(b));
   const testoIng = (r.ingredienti || []).map(i => String(i.nome || '').toLowerCase()).join(' ');
   const vegan = v.vegan !== undefined ? v.vegan : (!al.includes('LATTE') && !al.includes('UOVA') && !/miele|gelatina|carminio|cocciniglia/.test(testoIng));
   return { it: v.it || nomeItaliano(r.nome), en: v.en || nomeInglese(r.nome), img: v.img || illustrazionePer(r.nome),
@@ -297,6 +298,150 @@ const ICO = {
 };
 const EN_ALL = { LATTE:'MILK', 'FRUTTA A GUSCIO':'TREE NUTS', UOVA:'EGGS', SOIA:'SOY', ARACHIDI:'PEANUTS', SESAMO:'SESAME', SOLFITI:'SULPHITES',
   GLUTINE:'GLUTEN', PESCE:'FISH', CROSTACEI:'CRUSTACEANS', MOLLUSCHI:'MOLLUSCS', SEDANO:'CELERY', SENAPE:'MUSTARD', LUPINI:'LUPIN' };
+// ── CLAIM: calcolati dalla ricetta, come nella Linea Mente del bilanciatore (Reg. UE 432/2012) ──
+// Un claim si può usare solo se 100 g di gelato sono "fonte" del nutriente: almeno il 15% del valore di riferimento (VNR).
+// Banca dati e regole copiate dal bilanciatore (gelato_bilanciatore_integrated.html): se cambiano lì, aggiornarle qui.
+const NUTRA_DB = {
+  'Mirtilli':               { fib:2.4, b6:.052, vitE:.57, vitC:9.7, mg:6, k:77, fe:.28, zn:.16, cu:.057, mn:.336, ca:6, pol:450 },
+  'Noci':                   { ala:9.08, fib:6.7, b6:.537, vitE:.7, vitC:1.3, mg:158, k:441, fe:2.91, zn:3.09, cu:1.586, mn:3.414, ca:98, pol:1570 },
+  'Cacao naturale (non alcalinizzato)': { fib:37, b6:.118, vitE:.1, mg:499, k:1524, fe:13.86, zn:6.81, cu:3.788, mn:3.837, ca:128, pol:3400, flav:1500 },
+  'Cacao alcalinizzato':    { fib:29.8, b6:.118, mg:499, k:1524, fe:13.86, zn:6.81, cu:3.788, mn:3.837, ca:128, pol:1500, flav:300 },
+  'Banana':                 { fib:2.6, b6:.367, vitC:8.7, mg:27, k:358, fe:.26, cu:.078, mn:.27, ca:5 },
+  'Olio extravergine':      { vitE:14.35, fe:.56, k:1, pol:30 },
+  'Limone (succo)':         { vitC:38.7, k:103, mg:6, ca:6 },
+  'Curcuma (polvere)':      { fib:22.7, b6:.107, vitE:4.4, vitC:.7, mg:208, k:2080, fe:55, zn:4.5, cu:1.3, mn:19.8, ca:168, pol:3000 },
+  'Zenzero fresco':         { fib:2, b6:.16, vitC:5, mg:43, k:415, fe:.6, cu:.226, mn:.229, ca:16 },
+  'Pepe nero':              { fib:25.3, b6:.291, vitE:1.04, mg:171, k:1329, fe:9.71, zn:1.19, cu:1.33, mn:12.75, ca:443 },
+  'Latte di cocco':         { fib:2.2, mg:46, k:220, fe:3.3, zn:.56, cu:.23, mn:.8, ca:18 },
+  'Matcha':                 { fib:38, k:2700, pol:8000 },
+  'Mandorle':               { fib:12.5, b6:.137, vitE:25.63, mg:270, k:733, fe:3.71, zn:3.12, cu:1.031, mn:2.179, ca:269, pol:190 },
+  'Melograno (arilli)':     { fib:4, b6:.075, vitE:.6, vitC:10.2, mg:12, k:236, fe:.3, cu:.158, mn:.119, ca:10, pol:200 },
+  'Latte intero':           { b6:.036, mg:10, k:132, zn:.37, ca:113 },
+  // frutta secca e semi
+  'Nocciole':               { fib:9.7, b6:.563, vitE:15.03, vitC:6.3, mg:163, k:680, fe:4.7, zn:2.45, cu:1.725, mn:6.175, ca:114, pol:690 },
+  'Pistacchi':              { fib:10.6, b6:1.7, vitE:2.86, vitC:5.6, mg:121, k:1025, fe:3.92, zn:2.2, cu:1.3, mn:1.2, ca:105, pol:1420 },
+  'Semi di lino':           { ala:22.8, fib:27.3, b6:.473, vitE:.31, mg:392, k:813, fe:5.73, zn:4.34, cu:1.22, mn:2.48, ca:255 },
+  'Semi di chia':           { ala:17.8, fib:34.4, vitE:.5, mg:335, k:407, fe:7.72, zn:4.58, cu:.924, mn:2.72, ca:631 },
+  'Sesamo':                 { fib:11.8, b6:.79, vitE:.25, mg:351, k:468, fe:14.55, zn:7.75, cu:4.08, mn:2.46, ca:975 },
+  // frutti di bosco e frutta (dieta MIND)
+  'Fragole':                { fib:2, b6:.047, vitC:58.8, mg:13, k:153, fe:.41, mn:.386, ca:16, pol:290 },
+  'Lamponi':                { fib:6.5, b6:.055, vitE:.87, vitC:26.2, mg:22, k:151, fe:.69, zn:.42, cu:.09, mn:.67, ca:25, pol:215 },
+  'More':                   { fib:5.3, vitE:1.17, vitC:21, mg:20, k:162, fe:.62, zn:.53, cu:.165, mn:.646, ca:29, pol:260 },
+  'Kiwi':                   { fib:3, b6:.063, vitE:1.46, vitC:92.7, mg:17, k:312, fe:.31, cu:.13, ca:34 },
+  'Arancia (succo)':        { vitC:50, k:200, mg:11, ca:11, b6:.04 },
+  'Datteri':                { fib:6.7, b6:.249, mg:54, k:696, fe:.9, cu:.362, mn:.296, ca:64 },
+  'Castagne':               { fib:5.1, b6:.376, vitC:26, mg:30, k:518, cu:.447, mn:.952, ca:27 },
+  // agrumi nutraceutici, piante, spezie
+  'Bergamotto (succo)':     { vitC:40, k:150, pol:60, nota:"Ricco di flavonoidi (brutieridina, melitidina). Per il bergamotto non esiste un claim salutistico autorizzato per gli alimenti." },
+  'Aloe (gel)':             { vitC:3.8, nota:"Usare solo gel senza aloina: in UE gli estratti con derivati idrossiantracenici sono vietati. Nessun claim autorizzato." },
+  'Tè verde (infuso)':      { pol:89, flav:70, nota:"Valori per 100 g di infuso pronto: inserire nella ricetta il liquido d'infusione, non le foglie." },
+  'Camomilla (infuso)':     { pol:10, nota:"Valori per 100 g di infuso pronto. Per le piante officinali i claim valgono solo negli integratori, non nel gelato." },
+  'Ibisco (infuso)':        { pol:60, vitC:1, nota:"Valori per 100 g di infuso pronto. Nessun claim autorizzato per gli alimenti." },
+  'Menta fresca':           { fib:6.8, vitC:13.3, mg:63, k:458, fe:11.87, cu:.24, mn:1.118, ca:199, nota:"Nessun claim autorizzato per la pianta: contano solo vitamine e minerali." },
+  'Rosmarino fresco':       { fib:14.1, b6:.336, vitC:21.8, mg:91, k:668, fe:6.65, cu:.301, mn:.96, ca:317, pol:1000, nota:"Nessun claim autorizzato per la pianta: contano solo vitamine e minerali." },
+  'Cannella':               { fib:53.1, b6:.158, vitE:2.32, vitC:3.8, mg:60, k:431, fe:8.32, zn:1.83, cu:.339, mn:17.47, ca:1002, pol:9700 },
+  'Zafferano':              { vitC:80.8, b6:1.01, mg:264, k:1724, fe:11.1, cu:.328, mn:28.4, ca:111 },
+  'Spirulina':              { b6:.364, vitE:5, mg:195, k:1363, fe:28.5, zn:2, cu:6.1, mn:1.9, ca:120 },
+  'Panna':                  { k:75, ca:66 }
+};
+// Riconoscimento dell'ingrediente del bilanciatore → voce della banca dati (in ordine: il primo che combacia vince)
+const NUTRA_REGOLE = [
+  [/mirtill/i, 'Mirtilli'],
+  [/cacao.*(?<!non\s)alcalinizz/i, 'Cacao alcalinizzato'],     // solo se il nome dice esplicitamente "alcalinizzato"
+  [/cacao/i, 'Cacao naturale (non alcalinizzato)'],              // GREED usa solo cacao naturale
+  [/banan/i, 'Banana'],
+  [/(olio.*(oliv|evo)|extravergine)/i, 'Olio extravergine'],
+  [/limon/i, 'Limone (succo)'],
+  [/curcum/i, 'Curcuma (polvere)'],
+  [/zenzer/i, 'Zenzero fresco'],
+  [/pepe\s*nero/i, 'Pepe nero'],
+  [/(latte|crema).*cocco|cocco.*(latte|crema)/i, 'Latte di cocco'],
+  [/matcha|t[eè]\s*verde/i, 'Matcha'],
+  [/mandorl/i, 'Mandorle'],
+  [/melogran/i, 'Melograno (arilli)'],
+  [/nocciol/i, 'Nocciole'],
+  [/pistacch/i, 'Pistacchi'],
+  [/semi\s*di\s*lino|\blino\b/i, 'Semi di lino'],
+  [/\bchia\b/i, 'Semi di chia'],
+  [/sesam|tahin/i, 'Sesamo'],
+  [/fragol/i, 'Fragole'],
+  [/lampon/i, 'Lamponi'],
+  [/\bmor[ae]\b|more\s*di\s*rovo/i, 'More'],
+  [/\bkiwi/i, 'Kiwi'],
+  [/arancia|arance/i, 'Arancia (succo)'],
+  [/dattero|datteri/i, 'Datteri'],
+  [/castagn/i, 'Castagne'],
+  [/bergamott/i, 'Bergamotto (succo)'],
+  [/\baloe/i, 'Aloe (gel)'],
+  [/camomill/i, 'Camomilla (infuso)'],
+  [/ibisc|karkad/i, 'Ibisco (infuso)'],
+  [/\bmenta\b/i, 'Menta fresca'],
+  [/rosmarin/i, 'Rosmarino fresco'],
+  [/cannell/i, 'Cannella'],
+  [/zafferan/i, 'Zafferano'],
+  [/spirulin/i, 'Spirulina'],
+  [/\bnoc[ei]\b|gherigli/i, 'Noci'],
+  [/latte\s*intero/i, 'Latte intero'],
+  [/panna/i, 'Panna']
+];
+// Valori nutritivi di riferimento giornalieri (Reg. UE 1169/2011)
+const VNR = { vitE:12, vitC:80, b6:1.4, mg:375, k:2000, fe:14, zn:10, cu:1, mn:2, ca:800 };
+const CLAIM_UE = {
+  b6:  ['contribuisce alla normale funzione del sistema nervoso', 'contribuisce alla normale funzione psicologica', 'contribuisce alla riduzione della stanchezza e dell\'affaticamento'],
+  mg:  ['contribuisce al normale funzionamento del sistema nervoso', 'contribuisce alla normale funzione psicologica', 'contribuisce alla riduzione della stanchezza e dell\'affaticamento'],
+  k:   ['contribuisce al normale funzionamento del sistema nervoso', 'contribuisce al mantenimento di una normale pressione sanguigna'],
+  fe:  ['contribuisce alla normale funzione cognitiva', 'contribuisce alla riduzione della stanchezza e dell\'affaticamento'],
+  zn:  ['contribuisce alla normale funzione cognitiva', 'contribuisce alla protezione delle cellule dallo stress ossidativo'],
+  cu:  ['contribuisce al normale funzionamento del sistema nervoso', 'contribuisce alla protezione delle cellule dallo stress ossidativo'],
+  mn:  ['contribuisce alla protezione delle cellule dallo stress ossidativo'],
+  vitE:['contribuisce alla protezione delle cellule dallo stress ossidativo'],
+  vitC:['contribuisce alla protezione delle cellule dallo stress ossidativo', 'contribuisce alla normale funzione del sistema immunitario'],
+  ca:  ['è necessario per il mantenimento di ossa normali']
+};
+const ARTICOLO_NUTR = { b6:'la vitamina B6', mg:'il magnesio', k:'il potassio', fe:'il ferro', zn:'lo zinco', cu:'il rame', mn:'il manganese', vitE:'la vitamina E', vitC:'la vitamina C', ca:'il calcio' };
+const NOME_NUTR = { b6:'Vitamina B6', mg:'Magnesio', k:'Potassio', fe:'Ferro', zn:'Zinco', cu:'Rame', mn:'Manganese', vitE:'Vitamina E', vitC:'Vitamina C', ca:'Calcio' };
+function nutraVoce(nome) { for (const [re, voce] of NUTRA_REGOLE) if (re.test(nome || '')) return voce; return null; }
+// Ingredienti con le basi esplose (es. "Base bianca" → latte, panna, zucchero… in proporzione)
+function righeNutrizione(r) {
+  const out = [];
+  (r.ingredienti || []).forEach(i => { const q = +i.d || +i.q || +i.g || 0; if (!q) return;
+    const b = BASI_LAB[_normLab(i.nome)];
+    if (b && (b.ingredienti || []).length) { const tb = b.ingredienti.reduce((t, x) => t + (+x.d || +x.q || +x.g || 0), 0) || 1;
+      b.ingredienti.forEach(x => { const qx = +x.d || +x.q || +x.g || 0; if (qx) out.push({ nome: x.nome, q: q * qx / tb }); }); }
+    else out.push({ nome: i.nome, q }); });
+  return out;
+}
+function claimRicetta(r) {
+  const righe = righeNutrizione(r); let tot = 0, noci = 0; const somma = {};
+  righe.forEach(({ nome, q }) => { tot += q; const voce = nutraVoce(nome), v = voce ? NUTRA_DB[voce] : null; if (voce === 'Noci') noci += q;
+    if (v) Object.entries(v).forEach(([k, x]) => { if (typeof x === 'number') somma[k] = (somma[k] || 0) + x * q / 100; }); });
+  if (!tot) return { testi: [], fonti: [], calcolato: false };
+  const per100 = {}; Object.entries(somma).forEach(([k, x]) => per100[k] = x / tot * 100);
+  const testi = [], fonti = [];
+  Object.keys(CLAIM_UE).forEach(k => { const pct = (per100[k] || 0) / VNR[k] * 100;
+    if (pct >= 15) { fonti.push(`${NOME_NUTR[k]} ${Math.round(pct)}%`); CLAIM_UE[k].forEach(t => testi.push(`Fa bene: ${ARTICOLO_NUTR[k]} ${t}.`)); } });
+  if ((per100.ala || 0) >= 0.6) { fonti.push('Omega-3 ALA'); testi.push("Fa bene: l'acido alfa-linolenico contribuisce al mantenimento di livelli normali di colesterolo nel sangue (effetto con 2 g al giorno)."); }
+  if (noci / tot * 100 >= 30) { fonti.push('Noci'); testi.push("Fa bene: le noci contribuiscono a migliorare l'elasticità dei vasi sanguigni (effetto con 30 g di noci al giorno)."); }
+  if ((per100.flav || 0) >= 200) { fonti.push('Flavanoli del cacao'); testi.push("Fa bene: i flavanoli del cacao aiutano a mantenere l'elasticità dei vasi sanguigni, contribuendo a un normale flusso sanguigno (effetto con 200 mg al giorno)."); }
+  return { testi, fonti, calcolato: true };
+}
+function selectClaim(k, r, d) {
+  const c = claimRicetta(r), opz = ['', ...c.testi];
+  const fuori = d.claim && !c.testi.includes(d.claim);
+  if (fuori) opz.push(d.claim);
+  const nota = !c.calcolato ? 'Ricetta senza grammi: non posso calcolare i claim.'
+    : c.fonti.length ? `✅ Consentiti dalla ricetta (per 100 g, % del valore giornaliero): ${c.fonti.join(', ')}` : 'Nessun claim consentito con questa ricetta.';
+  return `<select onchange="salvaVoce('${esc(k)}','claim',this.value)">${opz.map(t => `<option value="${esc(t)}" ${t === d.claim ? 'selected' : ''}>${t ? (t === d.claim && fuori ? '⚠️ NON CONSENTITO: ' : '') + esc(t.replace('Fa bene: ', '').slice(0, 80)) + '…' : '— nessuno —'}</option>`).join('')}</select>
+    <div class="stato" style="font-size:11px;${fuori ? 'color:#a33;font-weight:600' : ''}">${fuori ? '⚠️ Il claim scelto non è consentito da questa ricetta: toglilo. ' : ''}${esc(nota)}</div>`;
+}
+// ── Allergeni aggiunti a mano (es. una copia "Carbonara" che ha le uova) ──
+function aggiungiAllergene(k, a) { if (!a) return; const v = [...new Set([...((VOCI[k] || {}).al_extra || []), a])]; salvaVoce(k, 'al_extra', v); }
+function togliAllergene(k, a) { salvaVoce(k, 'al_extra', ((VOCI[k] || {}).al_extra || []).filter(x => x !== a)); }
+function controlliAllergeni(k, d) {
+  const extra = (VOCI[k] || {}).al_extra || [], mancano = Object.keys(EN_ALL).filter(a => !d.al.includes(a));
+  return `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">${extra.map(a => `<span class="chip" style="background:#fdf0d5;color:#8a5a00">${esc(a)} <a href="#" style="color:#a33;text-decoration:none" title="Togli" onclick="togliAllergene('${esc(k)}','${esc(a)}');return false">✕</a></span>`).join('')}
+    <select style="width:auto;flex:1;min-width:120px" onchange="aggiungiAllergene('${esc(k)}',this.value)"><option value="">+ Aggiungi allergene</option>${mancano.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}</select></div>`;
+}
 // ── Misure regolabili: 100% = normale. Quelle generali valgono per tutte, quelle della singola etichetta si aggiungono. ──
 const MISURE_BASE = { foto: 1, tit: 1, sub: 1, en: 1, al: 1 };
 let MISURE = { ...MISURE_BASE }; const APERTI = new Set();
@@ -393,7 +538,7 @@ function render() {
         <label>Sottotitolo inglese</label><input value="${esc(d.subEn)}" placeholder="si traduce da solo" onchange="cambiaSubEn('${esc(k)}',this.value)">
         <label>Immagine</label><select onchange="salvaVoce('${esc(k)}','img',this.value)">${opzImg.replace(`value="${d.img}"`, `value="${d.img}" selected`)}</select>
         <label>Vegan</label><select onchange="salvaVoce('${esc(k)}','vegan',this.value==='si')"><option value="si" ${d.vegan ? 'selected' : ''}>Sì</option><option value="no" ${!d.vegan ? 'selected' : ''}>No</option></select>
-        <label>Claim (solo se la Linea Mente lo consente)</label><select onchange="salvaVoce('${esc(k)}','claim',this.value)">${CLAIM_SCELTE.map(c => `<option value="${esc(c)}" ${c === d.claim ? 'selected' : ''}>${c ? esc(c.replace('Fa bene: ', '').slice(0, 70)) + '…' : '— nessuno —'}</option>`).join('')}</select>
+        <label>Claim (calcolato dalla ricetta)</label>${selectClaim(k, r, d)}
         <details class="misure" ${APERTI.has(k) ? 'open' : ''} ontoggle="this.open ? APERTI.add('${esc(k)}') : APERTI.delete('${esc(k)}')"><summary>📏 Misure di questa etichetta</summary>${cursoriMisure(d.mis || {}, `misuraEtichetta('${esc(k)}',`, ['tit', 'sub', 'en', 'al'])}
           <button type="button" style="padding:4px 8px;font-size:11px;background:#eef2ea;color:#2d6a4f" onclick="salvaVoce('${esc(k)}','mis',{})">Rimetti normali</button></details>
         <label>Foto dell'ingrediente</label>
@@ -402,7 +547,8 @@ function render() {
           <button type="button" style="padding:6px 10px;font-size:12px;background:#eef2ea;color:#2d6a4f" onclick="copiaPrompt('${esc(k)}')">📋 Testo per Canva</button>
           ${d.foto ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="togliFoto('${esc(k)}')">Togli</button>` : ''}
         </div>
-        <div class="stato">Allergeni presi dalla ricetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
+        <div class="stato">Allergeni sull'etichetta: ${d.al.length ? esc(d.al.join(', ')) : 'nessuno'}</div>
+        ${controlliAllergeni(k, d)}
         <button type="button" style="padding:6px 10px;font-size:12px;background:#f3ecdc;color:#6a5a40" onclick="duplicaEtichetta('${esc(k)}')" title="Crea un'altra etichetta con gli stessi ingredienti e allergeni">📄 Duplica</button>
         ${r._copiaDi ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#fbeaea;color:#a33" onclick="eliminaCopia('${esc(k)}')">🗑️ Elimina questa copia</button>` : (VOCI[k] || {}).nascosta
           ? `<button type="button" style="padding:6px 10px;font-size:12px;background:#eef2ea;color:#2d6a4f" onclick="togliEtichetta('${esc(k)}',false)">↩️ Rimetti nelle etichette</button>`
